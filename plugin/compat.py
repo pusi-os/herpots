@@ -80,7 +80,7 @@ def check(resolve: Callable[[str], object] = importlib.import_module) -> None:
     gaps = missing(resolve)
     if gaps:
         raise RuntimeError(
-            "This Hermes Agent lacks what the Hermes Gadget plugin relies on: " + ", ".join(gaps)
+            "This Hermes Agent lacks what the HerPots plugin relies on: " + ", ".join(gaps)
             + f". The plugin was tested against Hermes commit {TESTED_HERMES_COMMIT[:12]}; "
             "update the plugin (hermes plugins install) or run that Hermes.")
 
@@ -93,7 +93,8 @@ APPROVAL_TIMEOUT_DEFAULT_S = 300
 def approval_timeout_s() -> int:
     """How long Hermes waits for an answer to a command approval, in seconds."""
     try:
-        from gateway.platforms.base_exec_approval import approval_timeout_seconds
+        # SEAM: the gateway's exec-approval timeout, so device approval cards time out
+        # exactly like local ones. Already degrades to the default below on ImportError.
 
         return int(approval_timeout_seconds())
     except Exception:
@@ -121,7 +122,7 @@ def approval_deny_only(session_key: str, request_id: Optional[str]) -> None:
     if not request_id:
         return
     try:
-        from tools.approval import restrict_gateway_approval_card_to_deny
+        from tools.approval import restrict_gateway_approval_card_to_deny  # SEAM: deny-only device approval cards, as the gateway shows locally
     except ImportError:
         return
     restrict_gateway_approval_card_to_deny(session_key, request_id)

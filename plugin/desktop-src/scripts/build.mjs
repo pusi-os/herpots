@@ -21,7 +21,7 @@ await build({
   legalComments: 'eof',
   external: ['react', 'react/jsx-runtime', '@hermes/plugin-sdk'],
   loader: { '.png': 'dataurl' },
-  banner: { js: `// Hermes Gadget ${version} — built from desktop-src/ (npm ci && npm run build). Do not edit.` },
+  banner: { js: `// HerPots ${version} — built from desktop-src/ (npm ci && npm run build). Do not edit.` },
   logLevel: 'warning'
 })
 console.log(`wrote ${outfile} (${(statSync(outfile).size / 1024).toFixed(0)} KiB)`)

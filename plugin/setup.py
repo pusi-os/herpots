@@ -1,6 +1,6 @@
-"""Hermes Gadget's step in ``hermes gateway setup``.
+"""HerPots's step in ``hermes gateway setup``.
 
-The wizard runs it when the user picks Hermes Gadget (``register_platform(setup_fn=...)``) and
+The wizard runs it when the user picks HerPots (``register_platform(setup_fn=...)``) and
 offers to restart the gateway afterwards, so this only enables the platform, asks for the port
 and points at the browser installer and ``hermes gadget pair``.
 """
@@ -43,7 +43,7 @@ def _set_config(key: str, value: str) -> bool:
 
 def interactive_setup() -> None:
     print_header, print_info, print_success, print_warning, prompt = _ui()
-    print_header("Hermes Gadget")
+    print_header("HerPots")
     print_info("Small ESP32 devices with a screen, microphone and speaker that talk to this Hermes over your network.")
 
     extra = cli._gadget_extra()
@@ -61,7 +61,7 @@ def interactive_setup() -> None:
     if port != current:
         settings.append(("platforms.gadget.extra.port", str(port)))
     if all(_set_config(key, value) for key, value in settings):
-        print_success("Hermes Gadget is enabled")
+        print_success("HerPots is enabled")
     else:
         print_warning("Couldn't update config.yaml from here. Run: hermes config set platforms.gadget.enabled true")
 

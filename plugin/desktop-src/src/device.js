@@ -1,4 +1,4 @@
-// The virtual gadget: a Hermes Gadget device that lives in the Desktop page. It speaks the same
+// The virtual gadget: a HerPots companion device that lives in the Desktop page. It speaks the same
 // protocol as the firmware (docs/protocol.md): hello, challenge, auth with its own key, pairing,
 // typed and spoken messages, streamed replies, spoken audio, cards, questions and actions. It knows
 // nothing about React; the page renders its state and feeds it input.

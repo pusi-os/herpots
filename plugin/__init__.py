@@ -1,4 +1,4 @@
-"""Hermes Gadget — a Hermes platform plugin that lets small hardware devices
+"""HerPots — a Hermes platform plugin that lets small hardware devices
 (ESP32 boards with a screen, microphone and speaker) talk to Hermes.
 
 Import-light on purpose: the adapter (and the gateway modules it needs) load
@@ -8,7 +8,7 @@ only when the gateway asks for the platform.
 from __future__ import annotations
 
 PLATFORM_HINT = (
-    "You are talking through a Hermes Gadget: a small physical device with a tiny screen "
+    "You are talking through a HerPots companion: a small physical device with a tiny screen "
     "(roughly 25-40 characters per line, under ten lines) that often reads your replies aloud. "
     "The user usually speaks to it, so their message is a speech transcript and may contain "
     "recognition errors. Reply in plain conversational text: no Markdown, tables, code blocks "

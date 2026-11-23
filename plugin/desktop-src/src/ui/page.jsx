@@ -1,4 +1,4 @@
-// The Gadgets page: a virtual gadget you can talk to right here, and every real gadget this Hermes
+// The HerPots page: a virtual gadget you can talk to right here, and every real gadget this Hermes
 // knows, mirrored live, with pairing approvals, cards for their screens and their actions.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Codicon } from '@hermes/plugin-sdk'
@@ -7,7 +7,7 @@ import { createDevice, newKey } from '../device.js'
 import { Screen } from './screen.jsx'
 import { CSS } from './styles.js'
 
-const VIRTUAL_NAME = 'Desktop Gadget'
+const VIRTUAL_NAME = 'Desktop HerPots'
 
 function useNow(ms = 500) {
   const [now, setNow] = useState(() => Date.now())
@@ -196,7 +196,7 @@ function VirtualGadget({ rest, storage, info, onDevice }) {
     if (dev.current?.sendText(draft)) setDraft('')
   }
   return (
-    <section className="hg-panel hg-stage" aria-label="Desktop Gadget">
+    <section className="hg-panel hg-stage" aria-label="Desktop HerPots">
       <Screen size={380} view={v} now={now} onAnswer={yes => dev.current?.answer(yes)} onDismiss={() => dev.current?.dismiss()} />
       <div className="hg-stage-row">
         <button
@@ -280,11 +280,11 @@ function VirtualGadget({ rest, storage, info, onDevice }) {
 function Setup() {
   return (
     <section className="hg-panel hg-setup" aria-label="Set up">
-      <h2>Turn on the Gadget platform</h2>
-      <p>Gadgets connect to your Hermes gateway. The platform is off on this Hermes.</p>
+      <h2>Turn on the HerPots platform</h2>
+      <p>Companions connect to your Hermes gateway. The platform is off on this Hermes.</p>
       <ol>
         <li>
-          Run <code>hermes gateway setup</code> and choose <b>Hermes Gadget</b>, or <code>hermes config set platforms.gadget.enabled true</code>.
+          Run <code>hermes gateway setup</code> and choose <b>HerPots</b>, or <code>hermes config set platforms.gadget.enabled true</code>.
         </li>
         <li>Restart the gateway (quit and reopen Hermes Desktop).</li>
         <li>Come back here: a virtual gadget connects on its own, and real ones appear on the right.</li>
@@ -438,12 +438,12 @@ export function GadgetsPage({ rest, storage }) {
       <div className="hg-wrap">
         <header className="hg-head">
           <div>
-            <h1 className="hg-title">Gadgets</h1>
+            <h1 className="hg-title">HerPots</h1>
             <p className="hg-sub">Hold a button, ask Hermes, hear the answer. Small devices for your own Hermes, with its tools and memory.</p>
           </div>
           <span className="hg-chip">
             <span className={`hg-dot ${running ? 'hg-tone-ok' : info && !info.enabled ? 'hg-tone-idle' : 'hg-tone-warn'}`} />
-            {running ? `Gadget platform on · ${online} online` : info && !info.enabled ? 'Gadget platform off' : 'Gateway not reporting'}
+            {running ? `HerPots platform on · ${online} online` : info && !info.enabled ? 'HerPots platform off' : 'Gateway not reporting'}
           </span>
         </header>
         <div className="hg-grid">
@@ -469,7 +469,7 @@ export function GadgetsPage({ rest, storage }) {
               </section>
             ) : null}
             <section className="hg-panel">
-              <h2>Your gadgets</h2>
+              <h2>Your companions</h2>
               {list.length ? (
                 <div className="hg-list">
                   {list.map(d => (

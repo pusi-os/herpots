@@ -1,4 +1,4 @@
-"""Hermes Gadget Protocol v1 — server-side constants and helpers.
+"""HerPots Protocol v1 (the Hermes Gadget wire format) — server-side constants and helpers.
 
 The normative description lives in ``docs/protocol.md``; the device side is
 ``firmware/core/include/hg/protocol.hpp``. Both sides are pinned to the same

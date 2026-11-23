@@ -60,7 +60,7 @@ def report_text(report: dict, log: str, hub_log: list[str], when: float | None =
     """The file's text: where and when it was taken, the device's report and log, then the hub's log."""
     stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(when))
     device_log = log.rstrip("\n")
-    return (f"Hermes Gadget diagnostics through the Hermes gateway, {stamp}\n\n"
+    return (f"HerPots diagnostics through the Hermes gateway, {stamp}\n\n"
             f"== report ==\n{json.dumps(report, indent=2)}\n\n"
             f"== recent log ==\n{device_log}\n\n"
             "== hub log ==\n" + "\n".join(hub_log) + "\n")

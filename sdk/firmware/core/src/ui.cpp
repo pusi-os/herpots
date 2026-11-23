@@ -2045,8 +2045,7 @@ void Ui::draw_hero(Canvas& c, const UiModel& m) {
     // 80% of the reserved square, bottom-aligned: his feet stay on the same
     // "floor" line (my + size + 6s) whatever the scale.
     const int drawn = size * 4 / 5;
-    potsy_glue::draw_hero(c, mx + size / 2, my + size - drawn + 6 * s, drawn, m.now_ms, m.speaking,
-                          m.body.c_str());
+    potsy_glue::draw_hero(c, mx + size / 2, my + size - drawn + 6 * s, drawn, m.now_ms, m.speaking);
   } else {
     draw_mascot_hero(c, m, g, size, mx, my);
   }

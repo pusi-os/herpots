@@ -1,4 +1,4 @@
-"""Hermes gateway platform adapter for Hermes Gadget devices.
+"""Hermes gateway platform adapter for HerPots companion devices.
 
 Each connected device is a direct-message chat whose ``chat_id`` and
 ``user_id`` are the device id. Everything Hermes already does for messaging
@@ -51,6 +51,13 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+# SEAM INVENTORY (catalog rule 9): a kind:platform adapter runs inside the gateway
+# process, so these imports are its load-bearing seams into Hermes, not convenience
+# shortcuts. Each one is either a base class / event type the adapter IS, or a
+# capability (STT, TTS, approvals, URL safety, pairing) reached through Hermes's own
+# tools so device sessions behave exactly like local ones. The full list, with the
+# fallbacks added where they can degrade, is in docs/herpots-catalog-plan.md; the
+# request to promote these to public ctx APIs is tracked in P5 (hermes-agent issue).
 from agent.i18n import get_language, t
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms._shared import extra_or_secret, get_scoped_secret as _get_scoped_secret
@@ -443,6 +450,9 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
         if not self._switching_on():
             return []
         try:
+            # SEAM (catalog rule 9): multiplex state and the profile roster are Hermes
+            # internals (docs/herpots-catalog-plan.md); no public ctx API yet. Any move
+            # degrades to an empty roster: a switching device reads that as "unknown".
             from agent.secret_scope import is_multiplex_active
             from hermes_cli.profiles import list_profiles, profiles_to_serve
 
@@ -693,11 +703,23 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
 
     @staticmethod
     def _profile_home(profile: str) -> Path:
+        # SEAM (catalog rule 9): profile homes live in Hermes's own layout; there is no
+        # public ctx API for them yet (see docs/herpots-catalog-plan.md). Falls back to
+        # $HERMES_HOME / ~/.hermes so a future Hermes that moves these modules still runs.
         if profile == "default":  # this gateway's own home, for a standalone profile too
-            from hermes_constants import get_hermes_home
-            return get_hermes_home()
-        from hermes_cli.profiles import get_profile_dir
-        return get_profile_dir(profile)
+            try:
+                from hermes_constants import get_hermes_home
+                return get_hermes_home()
+            except ImportError:
+                import os
+                return Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+        try:
+            from hermes_cli.profiles import get_profile_dir
+            return get_profile_dir(profile)
+        except ImportError:
+            import os
+            home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+            return home / "profiles" / profile
 
     async def _follow_face(self, session: DeviceSession) -> Optional[asyncio.Task]:
         """Another profile approving or revoking the device, or its face file or avatar changing, only

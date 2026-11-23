@@ -26,7 +26,7 @@ from typing import Callable, Optional
 
 from . import protocol
 
-PROJECT = "hermes_gadget"     # the ESP-IDF project name in every Hermes Gadget image
+PROJECT = "hermes_gadget"     # the ESP-IDF project name of the parent firmware images; HerPots builds accepted too (inspect_image)
 IMAGE_MAGIC = 0xE9            # esp_image_header_t.magic
 APP_DESC_MAGIC = 0xABCD5432   # esp_app_desc_t.magic_word, right after the image and segment headers
 APP_DESC_OFFSET = 32
@@ -65,14 +65,14 @@ def _cstr(raw: bytes) -> str:
 
 
 def inspect_image(data: bytes) -> FirmwareImage:
-    """Check that ``data`` is a Hermes Gadget app image (``firmware.bin``) and read its version and board."""
+    """Check that ``data`` is a HerPots app image (``firmware.bin``) and read its version and board."""
     if len(data) < APP_DESC_OFFSET + 256 or data[0] != IMAGE_MAGIC:
         raise UpdateError("not_an_image", "not an ESP32 app image; use firmware.bin from the build")
     if struct.unpack_from("<I", data, APP_DESC_OFFSET)[0] != APP_DESC_MAGIC:
         raise UpdateError("not_an_image", "the image has no app description; use firmware.bin from the build")
     project = _cstr(data[80:112])
-    if project != PROJECT:
-        raise UpdateError("wrong_firmware", f"the image is {project!r}, not Hermes Gadget firmware")
+    if project not in (PROJECT, "herpots"):
+        raise UpdateError("wrong_firmware", f"the image is {project!r}, neither Hermes Gadget nor HerPots firmware")
     board = None
     tag = data.find(BOARD_TAG)
     while tag >= 0 and board is None:  # older images also hold a nameless copy of the tag

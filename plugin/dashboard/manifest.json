@@ -1,7 +1,7 @@
 {
   "name": "gadget",
   "label": "Gadgets",
-  "description": "The Hermes Gadget devices this Hermes knows: board, firmware, last seen, online and battery",
+  "description": "The HerPots companion devices this Hermes knows: board, firmware, last seen, online and battery",
   "icon": "Cpu",
   "tab": {
     "path": "/gadget",
