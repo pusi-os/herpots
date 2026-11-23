@@ -2032,7 +2032,11 @@ void Ui::draw_hero(Canvas& c, const UiModel& m) {
   const int y0 = layout_.top_h;
   const int y1 = info_.height - layout_.bottom_h;
   const int lh = Canvas::line_height(s);
-  c.fill_rect(0, y0, w, y1 - y0, bg_);
+  // Potsy's backdrop: the DIGITAL rain behind him (glue decides). Anything
+  // else keeps the plain dark fill.
+  if (!(m.potsy && potsy_glue::paint_background(c, 0, y0, w, y1 - y0, m.now_ms))) {
+    c.fill_rect(0, y0, w, y1 - y0, bg_);
+  }
 
   const HeroGeom g = hero_geom(m);
   const int size = g.size, mx = g.x, my = g.y;
@@ -2053,14 +2057,59 @@ void Ui::draw_hero(Canvas& c, const UiModel& m) {
     c.fill_round_rect(r.x, r.y, r.w, r.h, 3 * s, kBar);
     c.text(name_marker_x(), r.y + s, "v", s, kAccent);
   }
-  // Caption: headline, then the detail lines, centred.
+  // Caption: headline, then the detail lines, centred — unless a glass-plate
+  // reply is showing: the agent's answer on a translucent rounded plate,
+  // white text, wrapped, scrolled through in reading time.
   const int cols = layout_.hero_cols;
-  std::string head = fit(m.headline, m.name_target ? layout_.name_cols : cols);
-  int cy = g.caption_y + std::max(0, g.name_h - (2 * lh + s)) / 2;
-  c.text((w - Canvas::text_width(head, s)) / 2, cy, head, s, caption_color(m.screen));
-  for (const auto& line : g.detail) {
-    cy += lh;
-    c.text((w - Canvas::text_width(line, s)) / 2, cy, line, s, kDim);
+  if (!m.glass_text.empty()) {
+    constexpr uint16_t kGlassTint = rgb565(120, 148, 170);
+    auto blend = [](uint16_t a, uint16_t b, int num, int den) {
+      const int ar = (a >> 11) & 0x1F, ag = (a >> 5) & 0x3F, ab = a & 0x1F;
+      const int br = (b >> 11) & 0x1F, bg = (b >> 5) & 0x3F, bb = b & 0x1F;
+      return rgb565(ar + (br - ar) * num / den, ag + (bg - ag) * num / den, ab + (bb - ab) * num / den);
+    };
+    const int plate_x = 6 * s, plate_w = w - 12 * s;
+    const int plate_y = g.caption_y, plate_h = std::max(lh, g.buttons_y - g.caption_y - 2 * s);
+    const uint16_t plate = blend(bg_, kGlassTint, 5, 15);
+    const uint16_t rim = blend(plate, kText, 1, 3);
+    c.fill_round_rect(plate_x, plate_y, plate_w, plate_h, 4 * s, rim);          // the rim ...
+    c.fill_round_rect(plate_x + 1, plate_y + 1, plate_w - 2, plate_h - 2, 4 * s - 1, plate);  // ... and the glass
+    c.fill_rect(plate_x + 4 * s, plate_y + 2, plate_w - 8 * s, 1, blend(plate, kText, 1, 5));  // glass highlight
+
+    const int pad_x = 3 * s, pad_y = s;
+    const int text_cols = cols_for(plate_w - 2 * pad_x, s);
+    auto lines = wrap_text(m.glass_text, text_cols);
+    const int rows = std::max(1, (plate_h - 2 * pad_y) / lh);
+    // Reading-time scroll: hold at the top, one line at a time to the bottom,
+    // rest there, then start over. Pure time, so redraws agree.
+    size_t offset = 0;
+    static std::string glass_last;
+    static uint32_t glass_epoch = 0;
+    if (m.glass_text != glass_last) {
+      glass_last = m.glass_text;
+      glass_epoch = m.now_ms;
+    }
+    const size_t overflow = lines.size() > static_cast<size_t>(rows) ? lines.size() - rows : 0;
+    if (overflow > 0) {
+      const uint32_t hold_top = 2000, step = 800, hold_end = 2500;
+      const uint32_t cycle = hold_top + static_cast<uint32_t>(overflow) * step + hold_end;
+      const uint32_t t = (m.now_ms - glass_epoch) % cycle;
+      offset = t < hold_top ? 0 : t < hold_top + overflow * step
+                                      ? static_cast<size_t>((t - hold_top) / step)
+                                      : overflow;
+    }
+    for (size_t i = 0; i < static_cast<size_t>(rows) && offset + i < lines.size(); i++) {
+      c.text(plate_x + pad_x, plate_y + pad_y + static_cast<int>(i) * lh,
+             lines[offset + i], s, kText);
+    }
+  } else {
+    std::string head = fit(m.headline, m.name_target ? layout_.name_cols : cols);
+    int cy = g.caption_y + std::max(0, g.name_h - (2 * lh + s)) / 2;
+    c.text((w - Canvas::text_width(head, s)) / 2, cy, head, s, caption_color(m.screen));
+    for (const auto& line : g.detail) {
+      cy += lh;
+      c.text((w - Canvas::text_width(line, s)) / 2, cy, line, s, kDim);
+    }
   }
 
   // Answer buttons (Prompt screen): TALK on the left, CANCEL on the right.

@@ -220,6 +220,9 @@ namespace Potsy {
     const char* outfitName();
     void        cycleOutfit();
     void        cyclePrevOutfit();
+    // Remote selection (the Hermes persona message): lands on `idx` whatever
+    // its unlock state, unlocking the set first if it has to. 0 clamps to NONE.
+    void        selectOutfit(uint8_t idx);
     uint8_t     unlockedOutfitCount();
     uint8_t     outfitCount();
 

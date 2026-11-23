@@ -21,6 +21,7 @@ set(HG_CORE_SOURCES
     src/mascot_data.cpp
     src/potsy/potsy.cpp
     src/potsy/glue.cpp
+    src/potsy/rain.cpp
     src/protocol.cpp
     src/qr.cpp
     src/setup.cpp

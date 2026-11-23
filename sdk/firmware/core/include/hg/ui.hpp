@@ -124,6 +124,9 @@ struct UiModel {
   bool hero = false;
   uint8_t caption_lines = 1;  // hero: lines the detail may wrap to (then "..")
   bool name_target = false;   // hero: the caption sits in a panel that a tap opens the profile list from
+  // Hero caption on a glass plate: the reply text (white, wrapped, auto-scrolled
+  // to fit). Non-empty replaces the headline/detail caption under the character.
+  std::string glass_text;
   const mascot::Face* face = nullptr;  // drawn instead of the mascot; borrowed like `qr`
   // hero, on Ready, Thinking and Responding: the face's expression (face.set). Other screens ignore it.
   mascot::Expression expression = mascot::Expression::Neutral;

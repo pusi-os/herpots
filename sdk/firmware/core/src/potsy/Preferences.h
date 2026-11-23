@@ -1,83 +1,81 @@
-// Potsy port compat: Preferences (NVS) stub. RAM-backed, never persisted —
-// Potsy's unlocks/cosmetics reset on reboot here, which v1 accepts.
+// Potsy port compat: Preferences (NVS) API over the port's hg::Storage.
+// PotsCharm's own cosmetics namespace (outfits, shades, shirts, glasses,
+// the Gods Mode flag) persists across reboots now — the values live in the
+// same store the app's settings use, keys are short enough for NVS and do
+// not collide with the hgadget setting keys.
+//
+// The storage is registered once at boot: potsy_glue::set_storage() from
+// the app (esp32 main owns the one hg::Storage instance). Reads before
+// registration and failed writes keep the in-memory default, same deal as
+// the RAM stub this replaces. The Arduino namespace argument is accepted
+// and ignored: the port's store is already namespaced.
 #pragma once
 
 #include <cstdint>
-#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
+#include "hg/hal.hpp"
+
+namespace potsy_prefs {
+
+// One hg::Storage for every Preferences instance. Set once from the app.
+inline hg::Storage* storage = nullptr;
+
+inline void use_storage(hg::Storage* store) { storage = store; }
+
+inline std::optional<std::string> read(const char* key) {
+  return storage ? storage->get(key) : std::nullopt;
+}
+inline bool write(const char* key, std::string_view value) {
+  return storage ? storage->set(key, value) : false;
+}
+
+}  // namespace potsy_prefs
+
 class Preferences {
  public:
-  bool begin(const char*, bool = false) { return true; }
+  bool begin(const char*, bool = false) { return true; }  // namespace kept for source compat
   void end() {}
 
   bool getBool(const char* key, bool def) {
-    Entry* e = find(key);
-    return e && e->kind == 'b' ? e->b : def;
+    auto v = potsy_prefs::read(key);
+    if (!v || v->empty()) return def;
+    return (*v)[0] != '0';
   }
   uint8_t getUChar(const char* key, uint8_t def) {
-    Entry* e = find(key);
-    return e && e->kind == 'u' ? e->u : def;
+    auto v = potsy_prefs::read(key);
+    if (!v || v->empty()) return def;
+    return static_cast<uint8_t>(std::atoi(v->c_str()));
   }
   uint32_t getUInt(const char* key, uint32_t def) {
-    Entry* e = find(key);
-    return e && e->kind == 'U' ? e->U : def;
+    auto v = potsy_prefs::read(key);
+    if (!v || v->empty()) return def;
+    return static_cast<uint32_t>(std::strtoul(v->c_str(), nullptr, 10));
   }
   size_t getString(const char* key, char* value, size_t maxLen) {
-    Entry* e = find(key);
-    const char* s = e && e->kind == 's' ? e->s.c_str() : "";
+    auto v = potsy_prefs::read(key);
+    const char* s = v ? v->c_str() : "";
     size_t n = std::min(std::strlen(s), maxLen ? maxLen - 1 : 0);
     std::memcpy(value, s, n);
     value[n] = 0;
     return n;
   }
   std::string getString(const char* key, const char* def) {
-    Entry* e = find(key);
-    return e && e->kind == 's' ? e->s : std::string(def);
+    auto v = potsy_prefs::read(key);
+    return v ? *v : std::string(def);
   }
 
-  bool putBool(const char* key, bool v) { Entry* e = set(key); e->kind = 'b'; e->b = v; return true; }
-  bool putUChar(const char* key, uint8_t v) { Entry* e = set(key); e->kind = 'u'; e->u = v; return true; }
-  bool putUInt(const char* key, uint32_t v) { Entry* e = set(key); e->kind = 'U'; e->U = v; return true; }
-  bool putString(const char* key, const char* v) { Entry* e = set(key); e->kind = 's'; e->s = v; return true; }
+  bool putBool(const char* key, bool v) { return potsy_prefs::write(key, v ? "1" : "0"); }
+  bool putUChar(const char* key, uint8_t v) { return potsy_prefs::write(key, std::to_string(v)); }
+  bool putUInt(const char* key, uint32_t v) { return potsy_prefs::write(key, std::to_string(v)); }
+  bool putString(const char* key, const char* v) { return potsy_prefs::write(key, v); }
 
   bool remove(const char* key) {
-    for (size_t i = 0; i < kMax; ++i) {
-      if (used_[i] && std::string(names_[i]) == key) { used_[i] = false; return true; }
-    }
-    return false;
+    if (!potsy_prefs::storage) return false;
+    potsy_prefs::storage->erase(key);
+    return true;
   }
-  void clear() { for (size_t i = 0; i < kMax; ++i) used_[i] = false; }
-
- private:
-  static constexpr size_t kMax = 48;
-  struct Entry {
-    char kind = 0;
-    bool b = false;
-    uint8_t u = 0;
-    uint32_t U = 0;
-    std::string s;
-  };
-  char names_[kMax][24] = {};
-  bool used_[kMax] = {};
-  Entry entries_[kMax];
-
-  Entry* find(const char* key) {
-    for (size_t i = 0; i < kMax; ++i)
-      if (used_[i] && std::string(names_[i]) == key) return &entries_[i];
-    return nullptr;
-  }
-  Entry* set(const char* key) {
-    Entry* e = find(key);
-    if (e) return e;
-    for (size_t i = 0; i < kMax; ++i) {
-      if (!used_[i]) {
-        used_[i] = true;
-        std::snprintf(names_[i], sizeof(names_[i]), "%s", key);
-        return &entries_[i];
-      }
-    }
-    return &entries_[0];
-  }
+  void clear() {}  // the store outlives one namespace; the stub's bulk wipe has no owner here
 };

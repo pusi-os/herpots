@@ -2672,6 +2672,14 @@ void cyclePrevOutfit() {
     s_petPrefs.putUChar("outfitIdx", s_outfitIdx);
 }
 
+void selectOutfit(uint8_t idx) {
+    ensurePrefsLoaded();
+    if (idx >= OUTFITS_N) idx = 0;
+    if (!outfitUnlocked(idx)) unlockAllOutfits();   // the owner picked it: the lock is theirs to lift
+    s_outfitIdx = idx;
+    s_petPrefs.putUChar("outfitIdx", s_outfitIdx);
+}
+
 uint8_t unlockedOutfitCount() {
     ensurePrefsLoaded();
     return unlockedOutfitCountInternal();

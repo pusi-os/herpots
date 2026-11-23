@@ -114,6 +114,11 @@ BoardConfig make() {
   b.lcd.width = 240;
   b.lcd.height = 240;
   b.lcd.invert = true;
+  // Same MADCTL combination as the zhengchen-154 board (verified on that
+  // hardware): the owner wants the cube's picture turned the same way.
+  b.lcd.swap_xy = true;
+  b.lcd.mirror_x = false;
+  b.lcd.mirror_y = true;
   b.lcd.mosi = 10;
   b.lcd.sclk = 9;
   b.lcd.cs = 14;

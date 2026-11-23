@@ -31,6 +31,10 @@ namespace hg::i18n {
   X(NoSpeakerDriver,        "No speaker driver is active.") \
   X(ScreenBrightness,       "Screen brightness") \
   X(BrightnessUnavailable,  "Brightness control is unavailable.") \
+  X(OutfitSetting,          "Potsy outfit") \
+  X(BackgroundSetting,      "Background") \
+  X(BackgroundDigitalRain,  "Digital rain") \
+  X(BackgroundSimple,       "Plain") \
   X(TalkMode,               "Talk mode") \
   X(NoMicDriver,            "No microphone driver is active.") \
   X(TalkModeHold,           "Hold to record; release to send.") \

@@ -10,6 +10,8 @@
 #include "hg/setup.hpp"
 #include "hg/wifi_networks.hpp"
 
+#include "potsy/potsy_glue.hpp"
+
 namespace hg {
 namespace {
 
@@ -204,13 +206,17 @@ const App::Route App::kRoutes[] = {
     {"ota.begin", &App::h_ota_begin},     {"ota.end", &App::h_ota_end},
     {"ota.abort", &App::h_ota_abort},     {"dashboard", &App::h_dashboard},
     {"profile", &App::h_profile},         {"profiles", &App::h_profiles},
+    {"persona", &App::h_persona},
     {"face", &App::h_face},
     {"face.start", &App::h_face_start},   {"face.end", &App::h_face_end},
     {"face.thumb", &App::h_face_thumb},   {"face.thumb.start", &App::h_face_thumb_start},
     {"face.thumb.end", &App::h_face_thumb_end}, {"diag", &App::h_diag},
 };
 
-App::App(Hal& hal, DeviceProfile profile) : hal_(hal), profile_(std::move(profile)) {}
+App::App(Hal& hal, DeviceProfile profile) : hal_(hal), profile_(std::move(profile)) {
+  // Potsy's cosmetics persist through the port's store (Preferences.h).
+  potsy_glue::set_storage(hal_.storage);
+}
 
 void App::log(LogLevel level, std::string_view msg) {
   if (hal_.system) hal_.system->log(level, msg);
@@ -854,6 +860,16 @@ void App::h_profile(const json::Value& m) {
                  : tr(error == "busy"      ? i18n::Msg::ProfileRefusedBusy
                       : error == "unknown" ? i18n::Msg::ProfileRefusedUnknown
                                            : i18n::Msg::ProfileRefused));
+}
+
+// Hermes's look for this device's answering profile (the persona the plugin
+// keeps per bot): Potsy's outfit and the hero backdrop. Numbers clamp; the
+// look persists on the device, so a device taken offline keeps it.
+void App::h_persona(const json::Value& m) {
+  const json::Value& background = m["background"];
+  const json::Value& outfit = m["outfit"];
+  if (background.is_number()) potsy_glue::select_background(static_cast<uint8_t>(background.as_int()));
+  if (outfit.is_number()) potsy_glue::select_outfit(static_cast<uint8_t>(outfit.as_int()));
 }
 
 void App::h_face(const json::Value& m) {
@@ -3202,10 +3218,15 @@ void App::update_model() {
     m.hint = profile_.touch_screen && touch_talk_ ? std::string(tr(Msg::HoldToReply)) : tr(Msg::ButtonToReply, {talk});
     // Spoken audio can start before the text arrives: let the mascot talk meanwhile.
     m.hero = reply_.empty();
+    // Potsy stays on screen while the answer reads on the glass plate below him.
+    if (potsy_ && !interpret_) {
+      m.hero = true;
+      m.glass_text = reply_;
+    }
     // While it is spoken, the face talks over the reply's latest two lines, where they fit.
     if (interpret_) {
       interpret_text(m);  // the translation is for the other person to read: never the caption
-    } else if (m.speaking && !reply_shown_ && ui_ && ui_->talk_caption_fits()) {
+    } else if (!potsy_ && m.speaking && !reply_shown_ && ui_ && ui_->talk_caption_fits()) {
       m.hero = true;
       m.caption_lines = 2;
       const std::string& text = reply_.empty() ? status_ : reply_;
@@ -3226,6 +3247,11 @@ void App::update_model() {
                                    : tr(tap ? Msg::TapButtonToTalk : Msg::HoldButtonToTalk, {talk});
     bool showing_reply = !reply_.empty() && static_cast<int32_t>(reply_until_ - now()) > 0;
     m.hero = !showing_reply;
+    // Potsy reads the last reply on the glass plate instead of the full-text view.
+    if (potsy_ && showing_reply && !interpret_) {
+      m.hero = true;
+      m.glass_text = reply_;
+    }
     if (m.hero) {
       const bool switching = agent_profiles_.size() > 1;
       m.headline = switching && agent_profile_ != "default" ? tr(Msg::ProfileGreeting, {agent_profile_name()})

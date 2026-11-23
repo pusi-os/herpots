@@ -8,6 +8,8 @@
 
 #include "potsy/potsy_glue.hpp"
 
+#include "potsy/potsy_glue.hpp"
+
 namespace hg {
 
 bool App::settings_hold_live() const {
@@ -22,6 +24,8 @@ bool App::settings_title_hit(int x, int y) const {
 bool App::menu_offered(Menu item) const {
   switch (item) {
     case Menu::Profile: return agent_profiles_.size() > 1;
+    case Menu::Outfit: return potsy_;
+    case Menu::Background: return potsy_;
     case Menu::ProfileGrid: return profile_.touch_screen && agent_profiles_.size() > 1 && hal_.display != nullptr;
     case Menu::Power: return hal_.power != nullptr;
     case Menu::BatteryAlert: return hal_.power != nullptr && hal_.display != nullptr;
@@ -128,6 +132,12 @@ void App::settings_input(Button button, bool pressed) {
         const int next = brightness_ < 25 ? 25 : brightness_ < 50 ? 50 : brightness_ < 75 ? 75 : brightness_ < 100 ? 100 : 10;
         console("set brightness " + std::to_string(next));
       }
+      break;
+    case Menu::Outfit:
+      potsy_glue::cycle_outfit(true);
+      break;
+    case Menu::Background:
+      potsy_glue::cycle_background();
       break;
     case Menu::TalkMode:
       if (hal_.mic) console(talk_mode_ == TalkMode::Hold ? "set talk_mode tap" : "set talk_mode hold");
@@ -345,6 +355,8 @@ SettingRow App::settings_row(Menu item, const std::string& label, const std::str
       row.icon = Icon::Talk;
       row.value = hal_.mic ? tr(talk_mode_ == TalkMode::Hold ? i18n::Msg::TalkHold : i18n::Msg::TalkTap) : "";
       break;
+    case Menu::Outfit: row.icon = Icon::Person; break;
+    case Menu::Background: row.icon = Icon::Screen; break;
     case Menu::Profile: row.icon = Icon::Person; break;
     case Menu::ProfileGrid: row.icon = Icon::Grid; break;
     case Menu::Microphone: row.icon = Icon::Mic; row.kind = Kind::Action; break;
@@ -488,6 +500,15 @@ void App::settings_item(Menu item, UiModel& m) const {
       m.detail = tr(Msg::ScreenBrightness);
       m.body = hal_.display && hal_.display->info().has_backlight ? std::to_string(brightness_) + "%\n" + tr(Msg::ChangesSaved)
                                                                : std::string(tr(Msg::BrightnessUnavailable));
+      break;
+    case Menu::Outfit:
+      m.detail = tr(Msg::OutfitSetting);
+      m.body = std::string(potsy_glue::outfit_label()) + "\n" + tr(Msg::ChangesSaved);
+      break;
+    case Menu::Background:
+      m.detail = tr(Msg::BackgroundSetting);
+      m.body = std::string(potsy_glue::background_is_rain() ? tr(Msg::BackgroundDigitalRain) : tr(Msg::BackgroundSimple)) +
+               "\n" + tr(Msg::ChangesSaved);
       break;
     case Menu::TalkMode:
       m.detail = tr(Msg::TalkMode);
