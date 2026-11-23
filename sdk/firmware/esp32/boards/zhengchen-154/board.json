@@ -1,0 +1,5 @@
+{
+  "title": "Zhengchen 1.54 TFT WiFi (zhengchen-154)",
+  "summary": "ESP32-S3R8 16 MB, 1.54\" 240x240 ST7789 SPI, raw-I2S MEMS mic and speaker, BOOT/VOL+/VOL- keys, GPIO2 power-rail hold, CH340 UART (no USB-JTAG).",
+  "docs": "docs/hardware.md"
+}

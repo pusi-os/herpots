@@ -1,0 +1,11 @@
+# PlatformIO build output
+.pio/
+.pioenvs/
+*.pyc
+__pycache__/
+.offline/
+# Editor
+.vscode/
+*.swp
+# OS
+.DS_Store

@@ -1,0 +1,324 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    # A draft stays up for review. CI starts when the pull request is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changelog:
+    name: Changelog entry
+    # Every pull request adds a line to CHANGELOG.md's Unreleased section, or carries the
+    # no-changelog label (internal refactors, test-only fixes, dependency bumps).
+    # Dependabot's bumps are not user-facing; their PRs skip the check.
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          fetch-depth: 0
+      - name: Check
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Labels are read live, not from the event, so adding no-changelog and re-running the job works.
+          if gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels -q '.labels[].name' | grep -qx no-changelog; then
+            echo "no-changelog label: skipped"; exit 0
+          fi
+          if git diff --name-only "$BASE...HEAD" | grep -qx CHANGELOG.md; then
+            echo "CHANGELOG.md is updated"
+          else
+            echo "::error file=CHANGELOG.md::Add a line under '## Unreleased' in CHANGELOG.md, or label the PR no-changelog"
+            exit 1
+          fi
+
+  changes:
+    name: Changed areas
+    # A pull request runs only the jobs its files can affect. A push to main and a
+    # manual run build everything, which also catches what a filter misses.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      firmware: ${{ steps.areas.outputs.firmware }}
+      python: ${{ steps.areas.outputs.python }}
+      site: ${{ steps.areas.outputs.site }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          fetch-depth: 0
+      - id: areas
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            printf 'firmware=true\npython=true\nsite=true\n' | tee -a "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "$BASE...HEAD")
+          printf '%s\n' "$files"
+          changed() { printf '%s\n' "$files" | grep -qE "$1" && echo true || echo false; }
+          # A change to this workflow runs everything.
+          workflow='^\.github/workflows/ci\.yml$'
+          {
+            # The host core, the board images and the ESP-IDF builds.
+            echo "firmware=$(changed "$workflow|^firmware/")"
+            # pytest builds the simulator from firmware/ and checks the docs' commands, so only a
+            # change confined to the installer site skips it.
+            echo "python=$(printf '%s\n' "$files" | grep -qvE '^site/' && echo true || echo false)"
+            # The site renders docs/ and checks their links into the repository, and builds the
+            # dashboard tab.
+            echo "site=$(changed "$workflow|^site/|^docs/|^plugin/dashboard/|^[^/]+\.md$")"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  boards:
+    name: Pick firmware boards
+    # A pull request builds the boards its diff can affect (firmware/esp32/tools/ci_boards.py);
+    # the full-ci label, a push to main and a manual run build every board.
+    needs: changes
+    if: needs.changes.outputs.firmware == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      pio: ${{ steps.list.outputs.pio }}
+      idf: ${{ steps.list.outputs.idf }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7
+        with:
+          python-version: "3.12"
+      - id: list
+        working-directory: firmware/esp32
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Labels are read live, so adding full-ci and re-running the job builds every board.
+          if [ -n "$PR" ] && gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels -q '.labels[].name' | grep -qx full-ci; then
+            echo "full-ci label: every board"; BASE=
+          fi
+          picked=$(python tools/ci_boards.py ${BASE:+--base "$BASE"})
+          echo "$picked"
+          {
+            echo "pio=$(echo "$picked" | python -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["pio"]))')"
+            echo "idf=$(echo "$picked" | python -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["idf"]))')"
+          } >> "$GITHUB_OUTPUT"
+
+  core:
+    name: Firmware core (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.firmware == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - name: Configure
+        run: cmake -S firmware -B build/host -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build/host --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build/host -C Release --output-on-failure
+
+  python:
+    name: ${{ matrix.name }}
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {python: "3.10", os: ubuntu-24.04, name: "Python 3.10"}
+          - {python: "3.12", os: ubuntu-24.04, name: "Python 3.12"}
+          - {python: "3.12", os: ubuntu-24.04-arm, name: "Linux ARM64"}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev,images,display,mqtt]"
+      - name: Build the simulator library
+        run: hermes-gadget build-sim
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7; the installer's console client runs against the simulator core
+        with:
+          node-version: 22
+      - name: Install virtual display
+        run: sudo apt-get update && sudo apt-get install -y xvfb shellcheck libopus0 ffmpeg
+      - name: Test
+        # Tests that need a Hermes Agent checkout skip themselves here; hermes.yml runs them.
+        env:
+          HERMES_GADGET_UI_TESTS: "1"
+          # libopus is installed above, so test_opus fails instead of skipping if it can't load.
+          HG_REQUIRE_LIBOPUS: "1"
+          # ffmpeg is installed above too, so the gadget_play decoding tests fail instead of skipping without it.
+          HG_REQUIRE_FFMPEG: "1"
+        # In parallel; a test that fails is run again on its own, since a busy runner can make a
+        # simulator wait time out. A test that fails twice fails the job.
+        run: |
+          xvfb-run -a pytest -q -rs -n auto --durations=10 ||
+            xvfb-run -a pytest -q -rs --last-failed --last-failed-no-failures none
+      - name: Build the Linux installation package
+        if: matrix.name == 'Linux ARM64'
+        run: |
+          python -m pip wheel --no-deps . --wheel-dir build/wheels
+          python linux/package.py --library build/host/libhgsim.so --wheel build/wheels/hermes_gadget-*.whl
+          shellcheck linux/install.sh linux/test_install.sh linux/hermes-gadget-device
+      - name: Test installation and updates on Debian Trixie
+        if: matrix.name == 'Linux ARM64'
+        run: |
+          archive=$(find dist -name '*-linux-arm64.tar.gz')
+          docker run --rm -v "$PWD:/source:ro" debian:trixie-slim sh /source/linux/test_install.sh "/source/$archive"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+        if: matrix.name == 'Linux ARM64'
+        with:
+          name: linux-arm64
+          path: dist/hermes-gadget-*-linux-arm64.tar.gz*
+          if-no-files-found: error
+
+  site:
+    name: Installer site
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install
+        working-directory: site
+        run: npm ci
+      - name: Test
+        working-directory: site
+        run: npm test
+      - name: Build
+        working-directory: site
+        run: node scripts/build.mjs
+      - name: Install browser
+        working-directory: site
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        working-directory: site
+        run: npx playwright test
+
+  esp32:
+    name: ESP32 firmware (${{ matrix.board }})
+    needs: boards
+    if: needs.boards.outputs.pio != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.boards.outputs.pio) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6
+        with:
+          path: ~/.platformio
+          key: platformio-${{ runner.os }}-${{ hashFiles('firmware/esp32/platformio.ini', 'firmware/esp32/main/idf_component.yml') }}
+      - name: Install PlatformIO
+        run: pip install platformio==6.2.0
+      - name: Build
+        working-directory: firmware/esp32
+        run: pio run -e ${{ matrix.board }}
+      - name: Package
+        working-directory: firmware/esp32
+        run: python tools/package_release.py --board ${{ matrix.board }} --out dist
+      - name: Keep the images
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+        with:
+          name: firmware-${{ matrix.board }}
+          path: firmware/esp32/dist/
+          if-no-files-found: error
+  esp32p4:
+    name: ESP32-P4 firmware (${{ matrix.board }})
+    needs: boards
+    if: needs.boards.outputs.idf != '[]'
+    runs-on: ubuntu-24.04
+    container: espressif/idf:v6.1@sha256:f81b6e077e6af93c312181cd7d4e7936cfbafc5c7f77cbacba8fdd34994f218a
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.boards.outputs.idf) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - name: Build
+        shell: bash
+        working-directory: firmware/esp32
+        env:
+          BOARD: ${{ matrix.board }}
+        run: |
+          source /opt/esp/idf/export.sh
+          idf.py -B "build/$BOARD" -D SDKCONFIG="build/$BOARD/sdkconfig" -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;boards/$BOARD/sdkconfig.defaults" set-target esp32p4
+          idf.py -B "build/$BOARD" -D SDKCONFIG="build/$BOARD/sdkconfig" -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;boards/$BOARD/sdkconfig.defaults" build
+      - name: Package
+        # The same images and manifests a release ships, so a contributor can flash CI builds.
+        # A board outside IDF_BOARDS is experimental: built, not released.
+        id: package
+        shell: bash
+        working-directory: firmware/esp32
+        env:
+          BOARD: ${{ matrix.board }}
+        run: |
+          source /opt/esp/idf/export.sh
+          if python -c 'import os, sys; sys.path.insert(0, "tools"); from package_release import IDF_BOARDS; sys.exit(os.environ["BOARD"] not in IDF_BOARDS)'; then
+            python tools/stage_idf_build.py "$BOARD" "build/$BOARD"
+            python tools/package_release.py --board "$BOARD" --out dist
+            echo "packaged=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Keep the images
+        if: steps.package.outputs.packaged == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+        with:
+          name: firmware-${{ matrix.board }}
+          path: firmware/esp32/dist/
+          if-no-files-found: error
+
+  result:
+    name: CI passed
+    # The one required check: it passes when every job above passed or was skipped as unaffected.
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    needs: [changes, boards, core, python, site, esp32, esp32p4]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "::error::a CI job ended as $r"; exit 1 ;; esac
+          done

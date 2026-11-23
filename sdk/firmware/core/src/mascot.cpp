@@ -1,0 +1,82 @@
+#include "hg/mascot.hpp"
+
+#include "hg/crypto.hpp"
+
+namespace hg::mascot {
+namespace {
+
+constexpr int kSizes[] = {96, 144};  // the mascot's, as mascot_data.cpp lists them (64px and 192px dropped for flash)
+constexpr size_t kAnchorBytes = 10 * 2;
+
+size_t frame_bytes(int size) { return static_cast<size_t>((size + 7) / 8) * static_cast<size_t>(size); }
+
+size_t bits_bytes() {
+  size_t n = 0;
+  for (int s : kSizes) n += 3 * frame_bytes(s);
+  return n;
+}
+
+size_t offset(int size, Frame frame) {
+  size_t off = 0;
+  for (int s : kSizes) {
+    if (s == size) return off + static_cast<size_t>(frame) * frame_bytes(s);
+    off += 3 * frame_bytes(s);
+  }
+  return off;
+}
+
+}  // namespace
+
+const char* expression_name(Expression e) {
+  switch (e) {
+    case Expression::Happy: return "happy";
+    case Expression::Confused: return "confused";
+    case Expression::Alert: return "alert";
+    case Expression::Sleepy: return "sleepy";
+    case Expression::Neutral: break;
+  }
+  return "neutral";
+}
+
+bool parse_expression(std::string_view name, Expression& out) {
+  for (Expression e : kExpressions) {
+    if (name == expression_name(e)) {
+      out = e;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool parse(std::string_view base64, Face& out) {
+  const size_t n = bits_bytes(), total = n + kAnchorBytes;
+  if (base64.size() != (total + 2) / 3 * 4) return false;
+  std::unique_ptr<uint8_t, Face::Free> data(static_cast<uint8_t*>(std::malloc(total)));
+  size_t len = 0;
+  if (!data || !crypto::base64_decode(base64, data.get(), total, len) || len != total) return false;
+  const uint8_t* a = data.get() + n;
+  int64_t v[10];
+  for (size_t i = 0; i < 10; ++i) v[i] = static_cast<int16_t>(a[2 * i] | (a[2 * i + 1] << 8));
+  if (!make_anchors(v, out.anchors)) return false;
+  out.bits = std::move(data);
+  return true;
+}
+
+bool make_anchors(const int64_t (&v)[10], Anchors& out) {
+  for (int64_t x : v)
+    if (x < 0 || x > 1000) return false;  // off the bitmap: the effects and blink repaints would miss
+  if (v[6] > v[7] || v[8] > v[9]) return false;  // the eye and mouth rows, top first
+  auto n = [&](int i) { return static_cast<int16_t>(v[i]); };
+  out = {{n(0), n(1)}, {n(2), n(3)}, {n(4), n(5)}, n(6), n(7), n(8), n(9)};
+  return true;
+}
+
+Bitmap pick(int max_size, Frame frame, const Face* face) {
+  const Bitmap* b = pick(max_size, frame);
+  if (!face || !face->bits) return *b;
+  return {b->size, frame, face->bits.get() + offset(b->size, frame)};
+}
+
+const Anchors& anchors(const Face* face) { return face ? face->anchors : anchors(); }
+
+}  // namespace hg::mascot

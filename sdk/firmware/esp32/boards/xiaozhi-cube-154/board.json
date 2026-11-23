@@ -1,0 +1,5 @@
+{
+  "title": "Xiaozhi AI cube (xiaozhi-cube-154)",
+  "summary": "ESP32-S3R8 16 MB, 1.54\" 240x240 ST7789 SPI, raw-I2S MEMS mic and speaker, BOOT/TALK + two volume keys, power latch.",
+  "docs": "docs/hardware.md"
+}
