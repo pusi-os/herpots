@@ -119,6 +119,9 @@ BoardConfig make() {
   b.lcd.swap_xy = true;
   b.lcd.mirror_x = false;
   b.lcd.mirror_y = true;
+  // The panel's active window sits ~1/4 width off the left edge (owner,
+  // verified on the device): gap_x shifts the picture right.
+  b.lcd.gap_x = 60;
   b.lcd.mosi = 10;
   b.lcd.sclk = 9;
   b.lcd.cs = 14;

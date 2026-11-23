@@ -75,6 +75,8 @@ from gateway.platforms.event import MessageEvent, MessageType
 from . import audio as gaudio
 from . import botchat, compat, dashboard, imaging, interpret, ota, runtime, stt, textfmt
 from . import diag as gdiag
+from . import persona as persona_store
+from . import protocol
 from .desk import Desk
 from . import status as live_status
 from . import face as faces
@@ -608,6 +610,10 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
             return "unpaired"
         session.profile = profile
         logger.info("[%s] %s now talks to profile %s", self.name, session.device_id, profile)
+        # A hello-time switch happens before the welcome; on_ready sends the look then, so only
+        # one already welcomed is told here: the device draws the profile it just switched to.
+        if session.welcomed and session.paired:
+            await self._send_persona(session)
         return None
 
     async def _reset_profile(self, session: DeviceSession) -> None:
@@ -793,6 +799,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
                 state = None
             await session.send_interpret(state.message() if state is not None else interpret.OFF)
             await self._interpret_release(session)  # a question asked, and messages pushed, while it was away
+            await self._send_persona(session)  # the profile's look, in case it changed while it was away
             await self._push_dashboard(session)
             return
         self._prompts.pop(session.device_id, None)  # unpaired while away: its questions are void
@@ -1183,6 +1190,8 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
     async def _desk_request(self, req: Dict[str, Any]) -> Dict[str, Any]:
         if req["kind"] == "interpret" and req.get("off"):  # also for a gadget that is away
             return {"ok": True, "was_on": await self.interpret_stop(req["device"])}
+        if req["kind"] == "persona":  # a look belongs to a profile, so it goes to every device on it
+            return await self._persona_request(str(req.get("profile") or ""))
         session = self._hub.get(req["device"]) if self._hub else None
         if session is None or session.closed:
             return {"ok": False, "error": "That gadget isn't connected right now."}
@@ -1213,6 +1222,38 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
             return {"ok": True, "result": result if isinstance(result, (dict, list, str, int, float, bool)) else None}
         except Exception as exc:
             return {"ok": False, "error": str(exc)[:200] or "the device didn't answer"}
+
+    async def _persona_request(self, profile: str) -> Dict[str, Any]:
+        """A persona broadcast from the Desktop page: the profile's look to each connected, paired
+        device that answers it."""
+        if not profile:
+            return {"ok": False, "error": "Name the profile the look belongs to."}
+        if self._status_dir is None:  # the adapter never runs without it; the type only says so
+            return {"ok": False, "error": "The gateway is not running."}
+        settings = await asyncio.to_thread(persona_store.settings, self._status_dir, profile)
+        sent = 0
+        for session in list(self._hub.sessions.values()) if self._hub else []:
+            if session.closed or not session.paired or not session.welcomed or session.profile != profile:
+                continue
+            if await self._send_persona(session, settings):
+                sent += 1
+        return {"ok": True, "sent": sent}
+
+    async def _send_persona(self, session: DeviceSession, settings: Optional[Dict[str, int]] = None) -> bool:
+        """Send `persona` (the profile's outfit and background) to one device, and False rather than
+        raise: a device that predates the message ignores an unknown type anyway, so a failed push
+        must not drop the session or hold up the rest of on_ready."""
+        try:
+            if settings is None:
+                if self._status_dir is None:
+                    return False
+                settings = await asyncio.to_thread(persona_store.settings, self._status_dir, session.profile)
+            await session.send_json(protocol.message(
+                "persona", outfit=settings["outfit"], background=settings["background"]))
+            return True
+        except Exception as exc:
+            logger.debug("[%s] persona push to %s failed: %s", self.name, session.device_id, exc)
+            return False
 
     async def _claim_home(self, session: DeviceSession) -> None:
         """Make the first approved device the platform's home channel.

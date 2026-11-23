@@ -9,6 +9,19 @@ import { CSS } from './styles.js'
 
 const VIRTUAL_NAME = 'Desktop HerPots'
 
+// What a device draws over Hermes (the persona message): the outfit and background a profile's
+// devices show, in the order the firmware numbers them. The look is saved per Hermes profile, not
+// per device; the devices answering a profile get it at their next welcome and on every change.
+const OUTFITS = [
+  'НЕТ', 'ТАНОУКИ', 'ЕДИНОРОГ', 'ФОЛЬГА', 'ТЕНЬ', 'САНТЕХНИК', 'ВЫСОКИЙ БРАТ', 'КОСМОС',
+  'СИНИЙ ВИХРЬ', 'КАПИТАН', 'ВОЛЧЬЯ ШКУРА', 'ХРОМОВОЕ КРЫЛО', 'ГЛАЗ ПУСТОТЫ', 'ЗИМНЯЯ ПАРКА',
+  'КОСТЮМ АКУЛЫ', 'ЙЗЗЕРД', 'СВЫШЕ 9000', 'ШАМБЛЕР', 'TH3 0N3', 'ПОЛОСКИ',
+]
+const BACKGROUNDS = [
+  'ЦИФРОВОЙ ДОЖДЬ', 'ЗВЁЗДНОЕ НЕБО', 'ТОСТЕРЫ', 'АКВАРИУМ', 'ТЕРМИНАЛ', 'СВЕТЛЯЧКИ',
+  'ОГОНЬ', 'СНЕГОПАД', 'СПЕКТР', 'ТОННЕЛЬ', 'СИНТВЕЙВ', 'ЧЁРНЫЙ',
+]
+
 function useNow(ms = 500) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -396,6 +409,53 @@ function Controls({ d, rest }) {
   )
 }
 
+function Persona({ d, rest }) {
+  // The selected device's look, saved for the Hermes profile answering it (its own for one that
+  // switches, default for the rest). The selects save the whole record, so the two change together.
+  const [persona, setPersona] = useState(null)
+  const [error, setError] = useState(null)
+  const profile = d.profile || 'default'
+  useEffect(() => {
+    rest('/persona').then(r => {
+      if (r?.ok) setPersona(r.persona ?? {})
+    }).catch(() => {})
+  }, [rest])
+  const record = persona?.[profile] ?? {}
+  const outfit = Number.isFinite(record.outfit) ? record.outfit : 0
+  const background = Number.isFinite(record.background) ? record.background : 0
+  const save = async (nextOutfit, nextBackground) => {
+    setError(null)
+    setPersona(p => ({ ...(p ?? {}), [profile]: { outfit: nextOutfit, background: nextBackground } }))
+    try {
+      const answer = await rest('/persona', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile, outfit: nextOutfit, background: nextBackground })
+      })
+      if (!answer?.ok) throw new Error(answer?.error ?? 'Failed')
+    } catch (e) {
+      setError(String(e?.message ?? e))
+      rest('/persona').then(r => { if (r?.ok) setPersona(r.persona ?? {}) }).catch(() => {})
+    }
+  }
+  return (
+    <div className="hg-field" aria-label="Персонаж">
+      <span>Персонаж ({profile})</span>
+      <div className="hg-row">
+        <select className="hg-input" value={outfit} aria-label="Костюм" onChange={e => save(Number(e.target.value), background)}>
+          {OUTFITS.map((name, i) => <option key={name} value={i}>{name}</option>)}
+        </select>
+      </div>
+      <div className="hg-row">
+        <select className="hg-input" value={background} aria-label="Фон" onChange={e => save(outfit, Number(e.target.value))}>
+          {BACKGROUNDS.map((name, i) => <option key={name} value={i}>{name}</option>)}
+        </select>
+      </div>
+      {error ? <div className="hg-error">{error}</div> : null}
+    </div>
+  )
+}
+
 export function GadgetsPage({ rest, storage }) {
   const [info, setInfo] = useState(null)
   const [devices, setDevices] = useState({ gateway: null, devices: [] })
@@ -484,6 +544,7 @@ export function GadgetsPage({ rest, storage }) {
               <section className="hg-panel">
                 <h2>{current.name || current.id}</h2>
                 <Controls d={current} rest={rest} />
+                <Persona d={current} rest={rest} />
               </section>
             ) : null}
           </aside>

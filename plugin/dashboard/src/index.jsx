@@ -31,6 +31,19 @@ const REFRESH_MS = 10000;
 // The SDK's fetch has no timeout: a request that never answers would stop the polling for good.
 const REQUEST_TIMEOUT_MS = 15000;
 
+// What a device draws over Hermes (the persona message): the outfit and background a profile's
+// devices show, in the order the firmware numbers them. The look is saved per Hermes profile, not
+// per device; the devices answering a profile get it at their next welcome and on every change.
+const OUTFITS = [
+  "НЕТ", "ТАНОУКИ", "ЕДИНОРОГ", "ФОЛЬГА", "ТЕНЬ", "САНТЕХНИК", "ВЫСОКИЙ БРАТ", "КОСМОС",
+  "СИНИЙ ВИХРЬ", "КАПИТАН", "ВОЛЧЬЯ ШКУРА", "ХРОМОВОЕ КРЫЛО", "ГЛАЗ ПУСТОТЫ", "ЗИМНЯЯ ПАРКА",
+  "КОСТЮМ АКУЛЫ", "ЙЗЗЕРД", "СВЫШЕ 9000", "ШАМБЛЕР", "TH3 0N3", "ПОЛОСКИ",
+];
+const BACKGROUNDS = [
+  "ЦИФРОВОЙ ДОЖДЬ", "ЗВЁЗДНОЕ НЕБО", "ТОСТЕРЫ", "АКВАРИУМ", "ТЕРМИНАЛ", "СВЕТЛЯЧКИ",
+  "ОГОНЬ", "СНЕГОПАД", "СПЕКТР", "ТОННЕЛЬ", "СИНТВЕЙВ", "ЧЁРНЫЙ",
+];
+
 function errorText(err) {
   return String((err && err.message) || err).replace(/^Error:\s*/, "");
 }
@@ -110,7 +123,29 @@ function SaveReport({ device }) {
   );
 }
 
-function DeviceTable({ devices }) {
+// One device's look: the outfit and background its screen draws, saved for the Hermes profile
+// answering it. The selects show the profile's stored values (0, 0 when it has none yet) and save
+// the whole record, so the two selects always change it together.
+function Persona({ device, persona, onSave }) {
+  const record = persona[device.profile] || {};
+  const outfit = typeof record.outfit === "number" ? record.outfit : 0;
+  const background = typeof record.background === "number" ? record.background : 0;
+  const select = "w-full px-1 py-0.5 text-xs rounded border border-input bg-background";
+  return (
+    <div className="flex flex-col gap-1" aria-label={`Персонаж (${device.profile})`}>
+      <select className={select} value={outfit} aria-label="Костюм"
+              onChange={(e) => onSave(device.profile, Number(e.target.value), background)}>
+        {OUTFITS.map((name, i) => <option key={name} value={i}>{name}</option>)}
+      </select>
+      <select className={select} value={background} aria-label="Фон"
+              onChange={(e) => onSave(device.profile, outfit, Number(e.target.value))}>
+        {BACKGROUNDS.map((name, i) => <option key={name} value={i}>{name}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function DeviceTable({ devices, persona, onSavePersona }) {
   const cell = "px-3 py-2 text-left align-top";
   return (
     <div className="overflow-x-auto">
@@ -123,6 +158,7 @@ function DeviceTable({ devices }) {
             <th className={cell}>Board</th>
             <th className={cell}>Firmware</th>
             <th className={cell}>Last seen</th>
+            <th className={cell}>Персонаж</th>
             <th className={cell}><span className="sr-only">Report</span></th>
           </tr>
         </thead>
@@ -140,6 +176,7 @@ function DeviceTable({ devices }) {
               <td className={cell} title={fullDate(d.online ? d.connected_at : d.last_seen)}>
                 {d.online ? "now" : when(d.last_seen)}
               </td>
+              <td className={cell}><Persona device={d} persona={persona} onSave={onSavePersona} /></td>
               <td className={cell}><SaveReport device={d} /></td>
             </tr>
           ))}
@@ -153,6 +190,8 @@ function HerPotsPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [persona, setPersona] = useState({});
+  const [personaError, setPersonaError] = useState("");
 
   const load = useCallback(() => {
     // Only the latest request's answer is shown, should a Refresh ever overlap a poll.
@@ -173,6 +212,35 @@ function HerPotsPage() {
         if (request === latestRequest) setLoading(false);
       });
   }, []);
+
+  const loadPersona = useCallback(() => {
+    SDK.fetchJSON(apiUrl("/persona"))
+      .then((r) => { if (r && r.ok) setPersona(r.persona || {}); })
+      .catch(() => {}); // the looks read as none without them; the next save writes them again
+  }, []);
+
+  useEffect(() => {
+    loadPersona();
+  }, [loadPersona]);
+
+  const savePersona = useCallback((profile, outfit, background) => {
+    // Shown at once; a push the gateway didn't take is reverted from the store and reported.
+    const before = persona;
+    setPersona((p) => ({ ...p, [profile]: { outfit, background } }));
+    setPersonaError("");
+    SDK.fetchJSON(apiUrl("/persona"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, outfit, background }),
+    })
+      .then((r) => {
+        if (!r || !r.ok) throw new Error((r && r.error) || "The look was not saved");
+      })
+      .catch((e) => {
+        setPersona(before);
+        setPersonaError(`${profile}: ${errorText(e)}`);
+      });
+  }, [persona]);
 
   useEffect(() => {
     // The next poll starts REFRESH_MS after this one settles, not on a fixed clock: a response
@@ -211,13 +279,16 @@ function HerPotsPage() {
           <div className="flex flex-col gap-3">
             {error && <p className="text-sm text-destructive">Could not load the devices: {error}</p>}
             {data && <GatewayNote gateway={data.gateway} count={devices.length} />}
+            {personaError && <p className="text-sm text-destructive">{personaError}</p>}
             {data && !devices.length && (
               <p className="text-sm text-muted-foreground">
                 No companions have connected yet. Set up a board from the installer, then approve it
                 with <code>hermes herpots pair</code>.
               </p>
             )}
-            {devices.length > 0 && <DeviceTable devices={devices} />}
+            {devices.length > 0 && (
+              <DeviceTable devices={devices} persona={persona} onSavePersona={savePersona} />
+            )}
           </div>
         </CardContent>
       </Card>

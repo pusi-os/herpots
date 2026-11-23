@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 PLUGIN_DIR = Path(__file__).resolve().parent.parent
 _PACKAGE = "hermes_gadget_dashboard_plugin"
@@ -48,6 +49,7 @@ def _plugin_package():
 
 
 _plugin_package()
+from hermes_gadget_dashboard_plugin import persona as persona_store  # noqa: E402
 from hermes_gadget_dashboard_plugin import status as live_status  # noqa: E402
 from hermes_gadget_dashboard_plugin.desk import Desk  # noqa: E402
 from hermes_gadget_dashboard_plugin.store import DeviceStore  # noqa: E402
@@ -66,7 +68,7 @@ def _data_dir() -> Path:
 
 def _device(device_id: str, rec: dict[str, Any], live: dict[str, Any] | None) -> dict[str, Any]:
     live = live or {}
-    return {
+    out = {
         "id": device_id,
         "name": rec.get("name") or "",
         "board": rec.get("board") or "",
@@ -76,11 +78,15 @@ def _device(device_id: str, rec: dict[str, Any], live: dict[str, Any] | None) ->
         "pending": bool(rec.get("pending")),
         "online": bool(live.get("online")),
         "connected_at": live.get("connected_at"),
+        # The profile answering it now, whose character look the page edits; an offline device
+        # takes the default one again at its next welcome, so that is what its edits land on.
+        "profile": (live.get("profile") or "default") if live else "default",
         "battery": live.get("battery") if isinstance(live.get("battery"), dict) else None,
         "paired": bool(live.get("paired")) if live else None,
         "activity": _activity(live.get("activity")),
         "actions": [a for a in (live.get("actions") or []) if isinstance(a, str)][:16],
     }
+    return out
 
 
 def _activity(raw: Any) -> dict[str, Any] | None:
@@ -107,6 +113,38 @@ def devices() -> dict[str, Any]:
                     "stale_after_s": live_status.STALE_AFTER_S},
         "devices": rows,
     }
+
+
+# -- character appearance -------------------------------------------------------------------------
+
+class PersonaBody(BaseModel):
+    """One profile's look: which outfit and background its devices draw. A None field keeps
+    what the profile had."""
+    profile: str
+    outfit: int | None = None
+    background: int | None = None
+
+
+@router.get("/persona")
+def persona() -> dict[str, Any]:
+    """Every profile's character appearance, keyed by profile name, as the devices take it."""
+    return {"ok": True, "persona": persona_store.all(_data_dir())}
+
+
+@router.put("/persona")
+def persona_write(body: PersonaBody) -> dict[str, Any]:
+    """Save one profile's character appearance and push it to the connected devices answering that
+    profile now, through the desk inbox the gateway carries, like a card or an action."""
+    try:
+        persona_store.save(_data_dir(), body.profile, body.outfit, body.background)
+    except ValueError as exc:
+        return _error(str(exc))
+    desk = Desk(_data_dir())
+    try:
+        req_id = desk.post_persona(body.profile)
+    except ValueError as exc:
+        return _error(str(exc))
+    return desk.wait(req_id, 6.0)
 
 
 

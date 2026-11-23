@@ -24,7 +24,7 @@ from typing import Any
 
 from . import interpret
 
-KINDS = ("card", "action", "diag", "interpret")
+KINDS = ("card", "action", "diag", "interpret", "persona")
 MAX_PENDING = 32
 EXPIRE_S = 30.0  # a request no gateway picked up in this long is dropped
 RESULT_KEEP_S = 120.0
@@ -99,6 +99,20 @@ class Desk:
             raise ValueError("too many requests are waiting; is the gateway running?")
         req_id = uuid.uuid4().hex
         _write_json(self.inbox / f"{req_id}.json", req)
+        return req_id
+
+    def post_persona(self, profile: str) -> str:
+        """Queue a persona broadcast and return its id: one profile's character appearance, which the
+        gateway sends to every connected device answering that profile (a card goes to one device,
+        a look belongs to a profile). Raises ValueError with a sentence on bad input."""
+        profile = str(profile or "").strip()
+        if not profile or len(profile) > 64:
+            raise ValueError("name the profile the look belongs to")
+        self.inbox.mkdir(parents=True, exist_ok=True)
+        if len(list(self.inbox.glob("*.json"))) >= MAX_PENDING:
+            raise ValueError("too many requests are waiting; is the gateway running?")
+        req_id = uuid.uuid4().hex
+        _write_json(self.inbox / f"{req_id}.json", {"kind": "persona", "profile": profile, "at": time.time()})
         return req_id
 
     def result(self, req_id: str) -> dict | None:

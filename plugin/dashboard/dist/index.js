@@ -18,6 +18,42 @@
   }
   var REFRESH_MS = 1e4;
   var REQUEST_TIMEOUT_MS = 15e3;
+  var OUTFITS = [
+    "НЕТ",
+    "ТАНОУКИ",
+    "ЕДИНОРОГ",
+    "ФОЛЬГА",
+    "ТЕНЬ",
+    "САНТЕХНИК",
+    "ВЫСОКИЙ БРАТ",
+    "КОСМОС",
+    "СИНИЙ ВИХРЬ",
+    "КАПИТАН",
+    "ВОЛЧЬЯ ШКУРА",
+    "ХРОМОВОЕ КРЫЛО",
+    "ГЛАЗ ПУСТОТЫ",
+    "ЗИМНЯЯ ПАРКА",
+    "КОСТЮМ АКУЛЫ",
+    "ЙЗЗЕРД",
+    "СВЫШЕ 9000",
+    "ШАМБЛЕР",
+    "TH3 0N3",
+    "ПОЛОСКИ"
+  ];
+  var BACKGROUNDS = [
+    "ЦИФРОВОЙ ДОЖДЬ",
+    "ЗВЁЗДНОЕ НЕБО",
+    "ТОСТЕРЫ",
+    "АКВАРИУМ",
+    "ТЕРМИНАЛ",
+    "СВЕТЛЯЧКИ",
+    "ОГОНЬ",
+    "СНЕГОПАД",
+    "СПЕКТР",
+    "ТОННЕЛЬ",
+    "СИНТВЕЙВ",
+    "ЧЁРНЫЙ"
+  ];
   function errorText(err) {
     return String(err && err.message || err).replace(/^Error:\s*/, "");
   }
@@ -71,14 +107,41 @@
     if (!device.online) return null;
     return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement(Button, { variant: "outline", size: "sm", onClick: save, disabled: busy }, busy ? "Asking the device..." : "Save diagnostics report"), error && /* @__PURE__ */ React.createElement("span", { className: "text-xs text-destructive" }, error));
   }
-  function DeviceTable({ devices }) {
+  function Persona({ device, persona, onSave }) {
+    const record = persona[device.profile] || {};
+    const outfit = typeof record.outfit === "number" ? record.outfit : 0;
+    const background = typeof record.background === "number" ? record.background : 0;
+    const select = "w-full px-1 py-0.5 text-xs rounded border border-input bg-background";
+    return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1", "aria-label": `Персонаж (${device.profile})` }, /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        className: select,
+        value: outfit,
+        "aria-label": "Костюм",
+        onChange: (e) => onSave(device.profile, Number(e.target.value), background)
+      },
+      OUTFITS.map((name, i) => /* @__PURE__ */ React.createElement("option", { key: name, value: i }, name))
+    ), /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        className: select,
+        value: background,
+        "aria-label": "Фон",
+        onChange: (e) => onSave(device.profile, outfit, Number(e.target.value))
+      },
+      BACKGROUNDS.map((name, i) => /* @__PURE__ */ React.createElement("option", { key: name, value: i }, name))
+    ));
+  }
+  function DeviceTable({ devices, persona, onSavePersona }) {
     const cell = "px-3 py-2 text-left align-top";
-    return /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-sm" }, /* @__PURE__ */ React.createElement("thead", { className: "text-xs uppercase text-muted-foreground" }, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", { className: cell }, "Device"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Status"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Battery"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Board"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Firmware"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Last seen"), /* @__PURE__ */ React.createElement("th", { className: cell }, /* @__PURE__ */ React.createElement("span", { className: "sr-only" }, "Report")))), /* @__PURE__ */ React.createElement("tbody", null, devices.map((d) => /* @__PURE__ */ React.createElement("tr", { key: d.id, className: "border-t border-border" }, /* @__PURE__ */ React.createElement("td", { className: cell }, /* @__PURE__ */ React.createElement("div", { className: "font-medium" }, d.name || d.id), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-xs text-muted-foreground" }, d.id)), /* @__PURE__ */ React.createElement("td", { className: cell }, /* @__PURE__ */ React.createElement(Status, { device: d })), /* @__PURE__ */ React.createElement("td", { className: cell }, /* @__PURE__ */ React.createElement(Battery, { battery: d.online ? d.battery : null })), /* @__PURE__ */ React.createElement("td", { className: cell }, d.board || "-"), /* @__PURE__ */ React.createElement("td", { className: cell + " font-mono" }, d.firmware || "-"), /* @__PURE__ */ React.createElement("td", { className: cell, title: fullDate(d.online ? d.connected_at : d.last_seen) }, d.online ? "now" : when(d.last_seen)), /* @__PURE__ */ React.createElement("td", { className: cell }, /* @__PURE__ */ React.createElement(SaveReport, { device: d })))))));
+    return /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-sm" }, /* @__PURE__ */ React.createElement("thead", { className: "text-xs uppercase text-muted-foreground" }, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", { className: cell }, "Device"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Status"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Battery"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Board"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Firmware"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Last seen"), /* @__PURE__ */ React.createElement("th", { className: cell }, "Персонаж"), /* @__PURE__ */ React.createElement("th", { className: cell }, /* @__PURE__ */ React.createElement("span", { className: "sr-only" }, "Report")))), /* @__PURE__ */ React.createElement("tbody", null, devices.map((d) => /* @__PURE__ */ React.createElement("tr", { key: d.id, className: "border-t border-border" }, /* @__PURE__ */ React.createElement("td", { className: cell }, /* @__PURE__ */ React.createElement("div", { className: "font-medium" }, d.name || d.id), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-xs text-muted-foreground" }, d.id)), /* @__PURE__ */ React.createElement("td", { className: cell }, /* @__PURE__ */ React.createElement(Status, { device: d })), /* @__PURE__ */ React.createElement("td", { className: cell }, /* @__PURE__ */ React.createElement(Battery, { battery: d.online ? d.battery : null })), /* @__PURE__ */ React.createElement("td", { className: cell }, d.board || "-"), /* @__PURE__ */ React.createElement("td", { className: cell + " font-mono" }, d.firmware || "-"), /* @__PURE__ */ React.createElement("td", { className: cell, title: fullDate(d.online ? d.connected_at : d.last_seen) }, d.online ? "now" : when(d.last_seen)), /* @__PURE__ */ React.createElement("td", { className: cell }, /* @__PURE__ */ React.createElement(Persona, { device: d, persona, onSave: onSavePersona })), /* @__PURE__ */ React.createElement("td", { className: cell }, /* @__PURE__ */ React.createElement(SaveReport, { device: d })))))));
   }
   function HerPotsPage() {
     const [data, setData] = useState(null);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [persona, setPersona] = useState({});
+    const [personaError, setPersonaError] = useState("");
     const load = useCallback(() => {
       const request = ++latestRequest;
       setLoading(true);
@@ -98,6 +161,30 @@
         if (request === latestRequest) setLoading(false);
       });
     }, []);
+    const loadPersona = useCallback(() => {
+      SDK.fetchJSON(apiUrl("/persona")).then((r) => {
+        if (r && r.ok) setPersona(r.persona || {});
+      }).catch(() => {
+      });
+    }, []);
+    useEffect(() => {
+      loadPersona();
+    }, [loadPersona]);
+    const savePersona = useCallback((profile, outfit, background) => {
+      const before = persona;
+      setPersona((p) => ({ ...p, [profile]: { outfit, background } }));
+      setPersonaError("");
+      SDK.fetchJSON(apiUrl("/persona"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, outfit, background })
+      }).then((r) => {
+        if (!r || !r.ok) throw new Error(r && r.error || "The look was not saved");
+      }).catch((e) => {
+        setPersona(before);
+        setPersonaError(`${profile}: ${errorText(e)}`);
+      });
+    }, [persona]);
     useEffect(() => {
       let timer = null;
       let stopped = false;
@@ -114,7 +201,7 @@
     }, [load]);
     const devices = data && data.devices || [];
     const online = devices.filter((d) => d.online).length;
-    return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-4" }, /* @__PURE__ */ React.createElement(Card, null, /* @__PURE__ */ React.createElement(CardHeader, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement(CardTitle, null, "HerPots"), /* @__PURE__ */ React.createElement(Button, { variant: "outline", size: "sm", onClick: load, disabled: loading }, "Refresh")), data && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-muted-foreground" }, devices.length, " known, ", online, " online.")), /* @__PURE__ */ React.createElement(CardContent, null, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, error && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-destructive" }, "Could not load the devices: ", error), data && /* @__PURE__ */ React.createElement(GatewayNote, { gateway: data.gateway, count: devices.length }), data && !devices.length && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-muted-foreground" }, "No companions have connected yet. Set up a board from the installer, then approve it with ", /* @__PURE__ */ React.createElement("code", null, "hermes herpots pair"), "."), devices.length > 0 && /* @__PURE__ */ React.createElement(DeviceTable, { devices })))));
+    return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-4" }, /* @__PURE__ */ React.createElement(Card, null, /* @__PURE__ */ React.createElement(CardHeader, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement(CardTitle, null, "HerPots"), /* @__PURE__ */ React.createElement(Button, { variant: "outline", size: "sm", onClick: load, disabled: loading }, "Refresh")), data && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-muted-foreground" }, devices.length, " known, ", online, " online.")), /* @__PURE__ */ React.createElement(CardContent, null, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, error && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-destructive" }, "Could not load the devices: ", error), data && /* @__PURE__ */ React.createElement(GatewayNote, { gateway: data.gateway, count: devices.length }), personaError && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-destructive" }, personaError), data && !devices.length && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-muted-foreground" }, "No companions have connected yet. Set up a board from the installer, then approve it with ", /* @__PURE__ */ React.createElement("code", null, "hermes herpots pair"), "."), devices.length > 0 && /* @__PURE__ */ React.createElement(DeviceTable, { devices, persona, onSavePersona: savePersona })))));
   }
   window.__HERMES_PLUGINS__.register("herpots", HerPotsPage);
 })();
