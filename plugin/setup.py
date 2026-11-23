@@ -2,7 +2,7 @@
 
 The wizard runs it when the user picks HerPots (``register_platform(setup_fn=...)``) and
 offers to restart the gateway afterwards, so this only enables the platform, asks for the port
-and points at the browser installer and ``hermes gadget pair``.
+and points at the browser installer and ``hermes herpots pair``.
 """
 
 from __future__ import annotations
@@ -57,16 +57,16 @@ def interactive_setup() -> None:
         print_warning(f"{answer!r} isn't a port number; keeping {current}")
         port = current
 
-    settings = [("platforms.gadget.enabled", "true")]
+    settings = [("platforms.herpots.enabled", "true")]
     if port != current:
-        settings.append(("platforms.gadget.extra.port", str(port)))
+        settings.append(("platforms.herpots.extra.port", str(port)))
     if all(_set_config(key, value) for key, value in settings):
         print_success("HerPots is enabled")
     else:
-        print_warning("Couldn't update config.yaml from here. Run: hermes config set platforms.gadget.enabled true")
+        print_warning("Couldn't update config.yaml from here. Run: hermes config set platforms.herpots.enabled true")
 
     url = cli.device_url({**extra, "port": port})
     print_info(f"Devices connect to {url}")
     print_info("Once the gateway has restarted, set up a device from Chrome or Edge:")
     print_info(f"  {cli.installer_link(url)}")
-    print_info("When the device shows a pairing code, approve it with: hermes gadget pair")
+    print_info("When the device shows a pairing code, approve it with: hermes herpots pair")

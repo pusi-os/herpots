@@ -4,10 +4,10 @@
 import { host, PALETTE_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA } from '@hermes/plugin-sdk'
 import { GadgetsPage } from './ui/page.jsx'
 
-const PATH = '/gadgets'
+const PATH = '/herpots'
 
 export default {
-  id: 'gadget',
+  id: 'herpots',
   name: 'HerPots',
   register(ctx) {
     const rest = (path, opts) => ctx.rest(path, opts)
@@ -28,7 +28,7 @@ export default {
         id: 'open',
         area: PALETTE_AREA,
         data: {
-          id: 'gadget.open',
+          id: 'herpots.open',
           label: 'Open HerPots',
           keywords: ["herpots", "potsy", "gadget", "device", "esp32", "voice", "hardware", "talk", "pair"],
           run: () => host.navigate(PATH)

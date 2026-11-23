@@ -4,11 +4,11 @@
     <img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" />
   </a>
 
-  # Hermes Gadget
+  # HerPots
 
   **Give your Hermes a place on your desk.**
 
-  This is the Hermes gateway plugin for [Hermes Gadget](https://github.com/Adolanium/hermes-gadget-sdk) devices.
+  This is the Hermes gateway plugin for [HerPots](https://github.com/pusi-os/herpots) devices.
   Hold a button on a small ESP32 board, ask a question, and hear your own Hermes answer.
 
   <sub>POWERED BY <a href="https://github.com/NousResearch/hermes-agent">HERMES AGENT</a> &nbsp;·&nbsp; COMMUNITY PLUGIN &nbsp;·&nbsp; VERSION 0.6.0</sub>
@@ -25,26 +25,26 @@
 
 Hermes Gadget adds a messaging platform to the [Hermes Agent](https://github.com/NousResearch/hermes-agent) gateway. Each gadget is a chat: you speak, Hermes's speech-to-text turns it into a message, your agent answers with its usual tools, memory and skills, and the reply is shown on the device and spoken through Hermes's text-to-speech. Unknown devices go through Hermes's own pairing codes, and command approvals appear on the device as yes/no questions.
 
-This directory is the plugin. The rest of the [repository](https://github.com/Adolanium/hermes-gadget-sdk) holds the device firmware, a [browser installer](https://adolanium.github.io/hermes-gadget-sdk/installer.html), a Raspberry Pi client and a desktop simulator.
+This directory is the plugin. The rest of the [repository](https://github.com/pusi-os/herpots) holds the device firmware, a [browser installer](https://adolanium.github.io/hermes-gadget-sdk/installer.html), a Raspberry Pi client and a desktop simulator.
 
 ## Install
 
 You need Hermes Agent 0.21.6 or newer, and a speech-to-text provider and voice set up in Hermes if you want to talk to the gadget.
 
 ```bash
-hermes plugins install https://github.com/Adolanium/hermes-gadget-sdk/tree/main/plugin --enable
+hermes plugins install https://github.com/pusi-os/herpots/tree/main/plugin --enable
 hermes gateway setup
 ```
 
-Choose **Hermes Gadget** in setup and restart the gateway when it asks. Then set up a board from the [installer](https://adolanium.github.io/hermes-gadget-sdk/installer.html) or try the [desktop simulator](https://adolanium.github.io/hermes-gadget-sdk/docs/desktop.html). The [Connect Hermes guide](../docs/connect-hermes.md) covers each step.
+Choose **HerPots** in setup and restart the gateway when it asks. Then set up a board from the [installer](https://adolanium.github.io/hermes-gadget-sdk/installer.html) or try the [desktop simulator](https://adolanium.github.io/hermes-gadget-sdk/docs/desktop.html). The [Connect Hermes guide](../docs/connect-hermes.md) covers each step.
 
 ## What it adds
 
 | | |
 | --- | --- |
 | **A gateway platform**<br />`gadget`, a WebSocket endpoint devices connect to. Each device is a direct-message chat, so sessions, `/stop`, `/new` and pairing work as on any platform. | **Eight agent tools**<br />`gadget_devices` lists connected gadgets, `gadget_display` shows a card on a screen (text, a list, a progress bar or a QR code), `gadget_ask` asks the user to pick one of a few answers there, `gadget_action` runs a device-declared action, such as an LED, relay or camera capture saved as PNG on the gateway, `gadget_speak` says something out loud on a gadget from any chat, `gadget_play` plays a sound file or an audio stream on a gadget's speaker, `gadget_widget` sets the full-screen widgets a gadget pages through from its home screen, and `gadget_interpret` turns a gadget into an interpreter between two languages. |
-| **A CLI**<br />`hermes gadget info`, `devices`, `pair`, `forget`, `update`, `interpret`, `tile` and `widget`. | **Over-the-air updates**<br />`hermes gadget update` sends new firmware to a connected gadget. |
-| **A dashboard**<br />Gadgets list the agent's sessions (idle, busy or waiting for approval) and status tiles set with `hermes gadget tile`. Session state comes from Hermes's plugin hooks. | **A tab in the Hermes dashboard**<br />**Gadgets** in `hermes dashboard` lists your devices: board, firmware, last seen, and while the gateway runs, online and battery. Read-only. |
+| **A CLI**<br />`hermes herpots info`, `devices`, `pair`, `forget`, `update`, `interpret`, `tile` and `widget`. | **Over-the-air updates**<br />`hermes herpots update` sends new firmware to a connected gadget. |
+| **A dashboard**<br />Gadgets list the agent's sessions (idle, busy or waiting for approval) and status tiles set with `hermes herpots tile`. Session state comes from Hermes's plugin hooks. | **A tab in the Hermes dashboard**<br />**HerPots** in `hermes dashboard` lists your devices: board, firmware, last seen, and while the gateway runs, online and battery. Read-only. |
 | **A page in Hermes Desktop**<br />**Gadgets** in the desktop app's sidebar: a gadget that runs in the window (hold to talk, or type), pairing approval, a live copy of each device's screen, and buttons to send a card or run a device action. | |
 
 Camera captures saved by the plugin are retained indefinitely under `~/.hermes/gadgetpix/`. The plugin does not prune old images; delete them manually to reclaim disk space.
@@ -54,19 +54,19 @@ Camera captures saved by the plugin are retained indefinitely under `~/.hermes/g
 Read this before you install.
 
 - **Opens a network port.** The gateway listens for gadgets on WebSocket port 8765 at `/gadget`, on all interfaces (`0.0.0.0`) by default. Set `host` in the platform's config to narrow it. Traffic is plain `ws://` unless you set `tls_cert` and `tls_key`. For access outside your network, the [remote access guide](../docs/tailscale-funnel.md) shows a setup that adds TLS.
-- **Who can connect.** A new device must be approved with a Hermes pairing code (`hermes gadget pair`), unless you list its id in `GADGET_ALLOWED_USERS`. `GADGET_ACCESS_TOKEN` adds a shared token every device must present. `GADGET_ALLOW_ALL_USERS` skips pairing for any device and is meant for development only. Secrets are read through Hermes's profile-scoped secret helpers.
+- **Who can connect.** A new device must be approved with a Hermes pairing code (`hermes herpots pair`), unless you list its id in `HERPOTS_ALLOWED_USERS`. `HERPOTS_ACCESS_TOKEN` adds a shared token every device must present. `HERPOTS_ALLOW_ALL_USERS` skips pairing for any device and is meant for development only. Secrets are read through Hermes's profile-scoped secret helpers.
 - **Answers approvals from the device.** When the agent asks to run a dangerous command, a paired gadget shows the command exactly as it will run, and its buttons answer it as **allow once** or **deny**. A paired device can therefore approve commands for its own chat. It never grants "always". A command that does not fit one line of the device's screen as-is can only be denied there; approve it on the host. The question lasts as long as Hermes's approval timeout (`approvals.timeout`, 300 seconds by default).
 - **Lets a paired device switch Hermes profiles.** Only when `profiles` is set in the default profile's platform config (`[work, home]`, or `all`): on a multiplexed gateway, a device approved in the default profile can then pick one of those profiles. The plugin writes nothing into other profiles: each one approves the device through its own pairing flow, and the device shows the command to run (`hermes -p <profile> pairing approve gadget <code>`). Revoking the device in the default profile sends it back there and stops it switching.
 - **Reads each profile's face.** A paired gadget that draws faces gets the face of the profile answering it: the profile's `gadget-face.bin`, or else its Hermes avatar (`assets/avatar.*`) converted on the host with Pillow, when Pillow is installed. A profile other than the default one shows its face only once Hermes would accept the device's turns in that profile, meaning that profile's pairing approval or the gateway's allowlist; until then the device shows the mascot. The plugin only reads these files. Set `profile_faces: false` in the platform's config to show the built-in mascot instead. See [Faces](../docs/faces.md#a-face-for-each-hermes-profile).
 - **Sets a home channel.** By default (`auto_home: true`) the first approved device becomes the gadget platform's home channel, so scheduled messages for that platform go to it.
 - **Runs `ffmpeg` locally** to convert spoken replies that are not plain WAV, and audio the agent plays with `gadget_play`, when `ffmpeg` is installed.
 - **Fetches audio the agent asks for.** When the agent calls `gadget_play` with an `http://` or `https://` URL, the gateway downloads it, as it plays, with Hermes's guarded HTTP client: addresses on your own network and on the Hermes computer are refused unless Hermes's `security.allow_private_urls` allows them. Behind an HTTP(S) proxy, Hermes leaves name resolution to the proxy, so restrict what the proxy may reach. With a file path, it reads only from Hermes's audio cache and the folders you list in `play_dirs`. Nothing a device sends starts a download. See [Playing audio](../docs/hermes-integration.md#playing-audio).
-- **Downloads firmware only when you ask.** `hermes gadget update <device> --latest` downloads the newest release's `manifest.json` and the board's image from this repository's GitHub releases, checks the image's size and SHA-256 against that manifest, and sends it to the device. Release files carry GitHub build provenance attestations (`gh attestation verify <file> --repo Adolanium/hermes-gadget-sdk`). Without `--latest`, it sends a file you name.
+- **Downloads firmware only when you ask.** `hermes herpots update <device> --latest` downloads the newest release's `manifest.json` and the board's image from this repository's GitHub releases, checks the image's size and SHA-256 against that manifest, and sends it to the device. Release files carry GitHub build provenance attestations (`gh attestation verify <file> --repo pusi-os/herpots`). Without `--latest`, it sends a file you name.
 - **Watches session state for the dashboard.** Plugin hooks tell it when a session starts or ends a turn and when it waits for an approval. Paired gadgets see each session's platform, the last four characters of its id and that state, never what was said. Set `dashboard: false` in the platform's config to turn this off.
-- **Writes its own data**, under `<hermes home>/plugin-data/gadget/`: the device list (`devices.json`), which devices are connected now, their battery and what their screens show (`status.json`, rewritten by the running gateway), cards and actions the Desktop page sent and their outcomes (`desk/`, kept for two minutes), staged firmware updates while they install, the dashboard's tiles (`dashboard.json`), a marker per device that has switched profiles (`owner-bound/`), and, only with `battery_log: true`, a CSV of each device's battery readings. When a device switches to another profile, it also writes that profile's pairing approval, as `hermes -p <profile> pairing approve` would.
+- **Writes its own data**, under `<hermes home>/plugin-data/herpots/`: the device list (`devices.json`), which devices are connected now, their battery and what their screens show (`status.json`, rewritten by the running gateway), cards and actions the Desktop page sent and their outcomes (`desk/`, kept for two minutes), staged firmware updates while they install, the dashboard's tiles (`dashboard.json`), a marker per device that has switched profiles (`owner-bound/`), and, only with `battery_log: true`, a CSV of each device's battery readings. When a device switches to another profile, it also writes that profile's pairing approval, as `hermes -p <profile> pairing approve` would.
 - **Uses Hermes's services**, which may be cloud services depending on your Hermes setup: speech-to-text for what you say (in the language `stt_language` sets, when you set one), text-to-speech for replies, and Hermes's image cache when the agent shows an image on a gadget. The plugin itself sends nothing else off your machine. There is no telemetry.
 - **Runs inside the gateway.** No separate background process. It stops when the gateway stops.
-- **Adds routes to the Hermes dashboard.** When the plugin is enabled, `hermes dashboard` (and Hermes Desktop, which runs it) loads `dashboard/plugin_api.py` and serves its routes under `/api/plugins/gadget/`, behind the dashboard's login. They read the files above and return no device keys. Three of them act, for the Desktop page: one approves the pairing code a device is showing, as `hermes gadget pair` does, and two send a card or run an action the device advertises on a connected, paired device. The [Hermes integration guide](../docs/hermes-integration.md#the-gadgets-tab-in-the-hermes-dashboard) lists them.
+- **Adds routes to the Hermes dashboard.** When the plugin is enabled, `hermes dashboard` (and Hermes Desktop, which runs it) loads `dashboard/plugin_api.py` and serves its routes under `/api/plugins/herpots/`, behind the dashboard's login. They read the files above and return no device keys. Three of them act, for the Desktop page: one approves the pairing code a device is showing, as `hermes herpots pair` does, and two send a card or run an action the device advertises on a connected, paired device. The [Hermes integration guide](../docs/hermes-integration.md#the-gadgets-tab-in-the-hermes-dashboard) lists them.
 - **Runs a gadget in Hermes Desktop.** The Desktop page connects to the gateway on `127.0.0.1` as a device of its own, with a key kept in the page's storage. It pairs like any other device. It uses the microphone only while you hold its talk button or Space.
 
 ## Limit who can reach the port
@@ -96,7 +96,7 @@ hermes plugins disable gadget
 hermes plugins remove gadget
 ```
 
-Delete `<hermes home>/plugin-data/gadget/` to forget paired devices and staged updates.
+Delete `<hermes home>/plugin-data/herpots/` to forget paired devices and staged updates.
 
 <div align="center">
   <br />

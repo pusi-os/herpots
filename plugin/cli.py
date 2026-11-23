@@ -1,4 +1,4 @@
-"""``hermes gadget ...`` — inspect and manage gadgets from the Hermes host."""
+"""``hermes herpots ...`` — inspect and manage gadgets from the Hermes host."""
 
 from __future__ import annotations
 
@@ -79,15 +79,15 @@ def _cmd_devices(args) -> None:
         print(f"{device_id}  {rec.get('name') or '-':<24} {rec.get('board') or '-':<28} "
               f"{rec.get('firmware') or '-':<10} last seen {when}"
               + ("  waiting to pair" if rec.get("pending") else ""))
-    print("\nApprove a new device: hermes gadget pair   |   Approved devices: hermes pairing list   |   "
-          "Revoke: hermes pairing revoke gadget <device_id>")
+    print("\nApprove a new device: hermes herpots pair   |   Approved devices: hermes pairing list   |   "
+          "Revoke: hermes pairing revoke herpots <device_id>")
 
 
 def _match(store, ref: str):
     """The one enrolled device whose id or name is ``ref``, or None (after saying so)."""
     matches = [d for d, r in store.devices().items() if d == ref or (r.get("name") or "").lower() == ref.lower()]
     if len(matches) != 1:
-        print(f"No single gadget matches {ref!r}. See: hermes gadget devices")
+        print(f"No single gadget matches {ref!r}. See: hermes herpots devices")
         return None
     return matches[0]
 
@@ -311,7 +311,7 @@ def _cmd_interpret(args) -> None:
     langs = list(args.languages)
     off = [word.lower() for word in langs] == ["off"]
     if not off and len(langs) != 2:
-        sys.exit("Give two languages, e.g. hermes gadget interpret kitchen es en, or 'off' to stop.")
+        sys.exit("Give two languages, e.g. hermes herpots interpret kitchen es en, or 'off' to stop.")
     desk = Desk(store.path.parent)
     try:
         req = (desk.post(device_id, "interpret", off=True) if off
@@ -334,7 +334,7 @@ def _cmd_interpret(args) -> None:
     if not outcome.get("draws"):
         print("This gadget's firmware doesn't draw the interpreter screen: translations appear as replies, "
               "and only this command switches who speaks next.")
-    print(f"Stop with: hermes gadget interpret {args.device} off   (or hold CANCEL on the gadget)")
+    print(f"Stop with: hermes herpots interpret {args.device} off   (or hold CANCEL on the gadget)")
 
 
 def _cmd_info(args) -> None:
@@ -382,7 +382,7 @@ def _cmd_pair(args) -> None:
             break
         if time.monotonic() >= deadline:
             sys.exit("No gadget asked to pair. Check that it shows a pairing code and that the gateway is "
-                     "running (hermes gadget info).")
+                     "running (hermes herpots info).")
         if not announced:
             print("Waiting for a gadget to show a pairing code. Ctrl+C stops waiting.")
             announced = True
@@ -398,7 +398,7 @@ def _cmd_pair(args) -> None:
     if args.yes and len(waiting) > 1:
         # Blind approval admits one device, not whoever happens to be asking.
         sys.exit("More than one gadget is waiting to pair; say which one:\n"
-                 + "\n".join(f"  hermes gadget pair --yes {device_id}   # {rec.get('name') or '-'}, code {code}"
+                 + "\n".join(f"  hermes herpots pair --yes {device_id}   # {rec.get('name') or '-'}, code {code}"
                              for device_id, rec, code in waiting))
     approved = 0
     for device_id, rec, code in waiting:
@@ -444,7 +444,7 @@ def _cmd_tile(args) -> None:
     else:
         shown = tiles.tiles()
         if not shown:
-            print("No tiles. Add one: hermes gadget tile set nas up --state ok")
+            print("No tiles. Add one: hermes herpots tile set nas up --state ok")
         for tile in shown:
             print(f"{tile['id']:<16} {tile['label']:<16} {tile['value']:<16} {tile.get('state', '-')}")
 
@@ -489,7 +489,7 @@ def _cmd_widget(args) -> None:
     else:
         scopes = tiles.widget_scopes()
         if not scopes:
-            print("No widgets. Add one: hermes gadget widget set office --value 21.5 --unit C --label Office")
+            print("No widgets. Add one: hermes herpots widget set office --value 21.5 --unit C --label Office")
         names = {d: r.get("name") or d for d, r in _store().devices().items()} if set(scopes) - {ALL_DEVICES} else {}
         for scope, widgets in scopes.items():
             target = "all" if scope == ALL_DEVICES else names.get(scope, scope)
