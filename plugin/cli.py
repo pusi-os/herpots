@@ -22,7 +22,7 @@ def _store():
 
     from .store import DeviceStore
 
-    return DeviceStore(plugin_data_dir("gadget"))
+    return DeviceStore(plugin_data_dir("herpots"))
 
 
 def _pairing_store():
@@ -46,7 +46,7 @@ def _gadget_extra() -> dict:
         from hermes_cli.config import load_config
 
         platforms = (load_config() or {}).get("platforms") or {}
-        cfg = platforms.get("gadget") or {}
+        cfg = platforms.get("herpots") or {}
         return {"enabled": bool(cfg.get("enabled")), **(cfg.get("extra") or {})}
     except Exception:
         return {}
@@ -56,7 +56,7 @@ def device_url(extra: dict) -> str:
     """The URL devices on this network should use, from ``platforms.gadget.extra``."""
     host = extra.get("host") or "0.0.0.0"
     port = extra.get("port") or 8765
-    path = "/" + str(extra.get("path") or "/gadget").strip("/")
+    path = "/" + str(extra.get("path") or "/herpots").strip("/")
     scheme = "wss" if extra.get("tls_cert") else "ws"
     shown = _lan_address() if host in ("0.0.0.0", "::", "") else host
     return f"{scheme}://{shown}:{port}{path}"
@@ -240,7 +240,7 @@ def _cmd_bot_chat(args) -> None:
     # Already there only when the Bot Chat is on the device's chat for that profile AND the device is on
     # that profile now (the gateway's live status): a device that moved on is switched back.
     live = live_status.read(store.path.parent)["devices"].get(device_id) or {}
-    if row.get("source") == "gadget" and row.get("chat_id") == device_id and live.get("profile") == profile:
+    if row.get("source") == "herpots" and row.get("chat_id") == device_id and live.get("profile") == profile:
         print(f"{name} is already in {profile}'s {BOT_CHAT_TITLE}.")
         return
 
@@ -260,7 +260,7 @@ def _cmd_bot_chat(args) -> None:
         if status.get("state") == "sent":
             chat_id = status.get("chat_id")
             row = bot_chat_row(home / "state.db") or {}
-            if row.get("chat_id") == chat_id and row.get("source") == "gadget":
+            if row.get("chat_id") == chat_id and row.get("source") == "herpots":
                 print(f"Done: {name} on {profile} now talks in {profile}'s {BOT_CHAT_TITLE}. Ask it to talk to "
                       f"the other Bots, e.g. \"ask the others what they think\". Hermes Desktop shows the same "
                       f"conversation.")
@@ -360,7 +360,7 @@ def _waiting_devices(approvals) -> list[tuple[str, dict, str]]:
     waiting = []
     for device_id, rec in sorted(store.devices().items()):
         pending = store.pairing_for(device_id)
-        if pending and not approvals.is_approved("gadget", device_id):
+        if pending and not approvals.is_approved("herpots", device_id):
             waiting.append((device_id, rec, pending[0]))
     return waiting
 
@@ -407,7 +407,7 @@ def _cmd_pair(args) -> None:
         if not args.yes and not _confirm(f"Approve {label}, showing code {code}?"):
             print(f"Left {name} unapproved.")
             continue
-        if approvals.approve_code("gadget", code) is None:
+        if approvals.approve_code("herpots", code) is None:
             print(f"Hermes didn't accept the code for {name}: it may have expired. The device gets a new one "
                   "when it reconnects.")
             continue
@@ -422,7 +422,7 @@ def _tiles():
 
     from .dashboard import TileStore
 
-    return TileStore(plugin_data_dir("gadget"))
+    return TileStore(plugin_data_dir("herpots"))
 
 
 def _cmd_tile(args) -> None:

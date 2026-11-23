@@ -58,7 +58,7 @@ def register(ctx) -> None:
     from .tools import register_tools
 
     ctx.register_platform(
-        name="gadget",  # stays "gadget": already-flashed devices and platforms.gadget configs depend on it
+        name="herpots",
         label="HerPots",
         adapter_factory=_make_adapter,
         check_fn=check_requirements,
@@ -66,9 +66,11 @@ def register(ctx) -> None:
         setup_fn=_setup,
         parse_target_ref_fn=_parse_target,
         install_hint="websockets is a core Hermes dependency; reinstall Hermes if it is missing",
-        allowed_users_env="GADGET_ALLOWED_USERS",
-        allow_all_env="GADGET_ALLOW_ALL_USERS",
-        cron_deliver_env_var="GADGET_HOME_CHANNEL",
+        # HERPOTS_* are the documented names; the GADGET_* ones stay honoured so an
+        # install carried over from the parent plugin keeps its allowlist.
+        allowed_users_env="HERPOTS_ALLOWED_USERS",
+        allow_all_env="HERPOTS_ALLOW_ALL_USERS",
+        cron_deliver_env_var="HERPOTS_HOME_CHANNEL",
         max_message_length=4000,
         emoji="📟",
         pii_safe=True,
@@ -81,7 +83,7 @@ def register(ctx) -> None:
     # Interpreter mode translates with Hermes's completion API for plugins, which carries no tools.
     runtime.set_llm(getattr(ctx, "profile_name", None) or "default", getattr(ctx, "llm", None))
     ctx.register_cli_command(
-        name="gadget",
+        name="herpots",
         help="Manage HerPots companions (ESP32 devices)",
         setup_fn=cli.setup_argparse,
         handler_fn=cli.handle,

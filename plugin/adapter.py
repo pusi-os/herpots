@@ -29,7 +29,7 @@ config.yaml::
           profile_faces: true    # each profile's face (gadget-face.bin or its avatar) on devices
           stt_language: auto     # or a language code such as pt: the language gadget speech is transcribed in
 
-Secrets (``~/.hermes/.env``): ``GADGET_ACCESS_TOKEN`` (optional shared token).
+Secrets (``~/.hermes/.env``): ``HERPOTS_ACCESS_TOKEN`` (optional shared token).
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ from .store import DeviceStore
 
 logger = logging.getLogger(__name__)
 
-PLATFORM_NAME = "gadget"
+PLATFORM_NAME = "herpots"
 MAX_MESSAGE_LENGTH = 4000
 PAIRING_TTL_S = 3600          # mirrors Hermes's pairing-code lifetime
 PAIRING_POLL_S = 2.0
@@ -272,7 +272,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
         self._host = str(extra.get("host") or "0.0.0.0")
         port = extra.get("port")
         self._port = 8765 if port in (None, "") else int(port)  # 0 = any free port
-        self._path = str(extra.get("path") or "/gadget")
+        self._path = str(extra.get("path") or "/herpots")
         self._heartbeat_s = int(extra.get("heartbeat_s") or 20)
         self._max_utterance_s = float(extra.get("max_utterance_s") or 60)
         # Speaker audio as Opus at this bitrate for devices that decode it; 0 keeps PCM16.
@@ -312,7 +312,10 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
         self._battery_log: Optional[BatteryLog] = None
         self._tls_cert = extra.get("tls_cert")
         self._tls_key = extra.get("tls_key")
-        self._access_token = extra_or_secret(extra, "access_token", "GADGET_ACCESS_TOKEN") or None
+        # HERPOTS_ACCESS_TOKEN is the documented name; a pre-rename install keeps working
+        # off GADGET_ACCESS_TOKEN until the owner moves it.
+        self._access_token = (extra_or_secret(extra, "access_token", "HERPOTS_ACCESS_TOKEN")
+                              or extra_or_secret(extra, "access_token", "GADGET_ACCESS_TOKEN")) or None
         self._hub: Optional[DeviceHub] = None
         self._store: Optional[DeviceStore] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None

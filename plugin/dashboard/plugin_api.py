@@ -61,7 +61,7 @@ def _data_dir() -> Path:
     # Resolved per request: it follows the profile the dashboard request is scoped to.
     from plugins.plugin_storage import plugin_data_dir
 
-    return plugin_data_dir("gadget")
+    return plugin_data_dir("herpots")
 
 
 def _device(device_id: str, rec: dict[str, Any], live: dict[str, Any] | None) -> dict[str, Any]:
@@ -129,7 +129,7 @@ def pairing() -> dict[str, Any]:
     waiting = []
     for device_id, rec in sorted(store.devices().items()):
         found = store.pairing_for(device_id)
-        if found and not approvals.is_approved("gadget", device_id):
+        if found and not approvals.is_approved("herpots", device_id):
             waiting.append({"id": device_id, "name": rec.get("name") or device_id,
                             "board": rec.get("board") or "", "code": found[0]})
     return {"ok": True, "waiting": waiting}
@@ -142,9 +142,9 @@ def approve(device_id: str) -> dict[str, Any]:
 
     store, approvals = DeviceStore(_data_dir()), PairingStore()
     found = store.pairing_for(device_id)
-    if not found or approvals.is_approved("gadget", device_id):
+    if not found or approvals.is_approved("herpots", device_id):
         return _error("That gadget isn't waiting to pair. It gets a new code when it reconnects.", 404)
-    if approvals.approve_code("gadget", found[0]) is None:
+    if approvals.approve_code("herpots", found[0]) is None:
         return _error("Hermes didn't accept the code: it may have expired. The gadget gets a new one when it reconnects.", 409)
     return {"ok": True, "approved": device_id}
 
@@ -194,7 +194,7 @@ def info() -> dict[str, Any]:
     try:
         from hermes_cli.config import load_config
 
-        cfg = ((load_config() or {}).get("platforms") or {}).get("gadget") or {}
+        cfg = ((load_config() or {}).get("platforms") or {}).get("herpots") or {}
     except Exception:
         cfg = {}
     extra = cfg.get("extra") or {}

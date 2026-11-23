@@ -19,7 +19,7 @@ from typing import Any
 from . import playback, runtime, textfmt
 from .hub import MAX_CARD_ITEMS, MAX_CHOICE_OPTIONS
 
-TOOLSET = "gadget"
+TOOLSET = "herpots"
 CALL_TIMEOUT_S = 20.0
 ASK_DEFAULT_S = 60    # how long gadget_ask waits for an answer, unless told otherwise
 ASK_MAX_S = 300       # ...and at most: Hermes's own approval timeout
@@ -244,7 +244,7 @@ def _resolve(adapter, ref: str | None):
             known = ", ".join(f"{s.name} ({s.device_id})" for s in hub.sessions.values()) or "none connected"
             return None, f"no connected gadget matches {ref!r}; connected: {known}"
         return session, None
-    if get_session_env("HERMES_SESSION_PLATFORM") == "gadget":
+    if get_session_env("HERMES_SESSION_PLATFORM") == "herpots":
         # The device behind the chat the turn runs in.
         session = hub.get(adapter._device_id(get_session_env("HERMES_SESSION_CHAT_ID") or ""))
         if session is not None:
@@ -586,7 +586,7 @@ def gadget_interpret(args: dict, **_kw) -> str:
         from gateway.session_context import get_session_env
 
         # Asked in this gadget's own chat: the turn asking may still say on it that the mode is on.
-        asked_here = (get_session_env("HERMES_SESSION_PLATFORM") == "gadget" and adapter._device_id(
+        asked_here = (get_session_env("HERMES_SESSION_PLATFORM") == "herpots" and adapter._device_id(
             get_session_env("HERMES_SESSION_CHAT_ID") or "") == session.device_id)
         state = _run(adapter, adapter.interpret_start(session, languages[0], languages[1], asked_here=asked_here))
     except ValueError as exc:

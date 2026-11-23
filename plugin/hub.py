@@ -1121,7 +1121,7 @@ class DeviceHub:
         *,
         host: str = "0.0.0.0",
         port: int = 8765,
-        path: str = "/gadget",
+        path: str = "/herpots",
         access_token: str | None = None,
         heartbeat_s: int = 20,
         ssl_context=None,

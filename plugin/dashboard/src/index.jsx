@@ -1,4 +1,4 @@
-// The Gadgets tab of the Hermes web dashboard: the devices this Hermes knows, and a diagnostics
+// The HerPots tab of the Hermes web dashboard: the devices this Hermes knows, and a diagnostics
 // report from each connected one.
 //
 // Source of dist/index.js. Build it with `npm run build:dashboard-tab` in site/ (esbuild, React
@@ -11,7 +11,7 @@ const { useCallback, useEffect, useState } = SDK.hooks;
 const { Badge, Button, Card, CardContent, CardHeader, CardTitle } = SDK.components;
 const { timeAgo } = SDK.utils;
 
-const API = "/api/plugins/gadget";
+const API = "/api/plugins/herpots";
 
 // The dashboard adds the selected profile to its own profile-scoped requests, but not to plugin
 // routes (/api/plugins/ is not among them). The route resolves the plugin's data directory from
@@ -77,7 +77,7 @@ function GatewayNote({ gateway, count }) {
 }
 
 // Saves a connected device's diagnostics report, with the gateway's recent log, as a text file:
-// what `hermes gadget diag` saves, for a bug report.
+// what `hermes herpots diag` saves, for a bug report.
 function SaveReport({ device }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -90,7 +90,7 @@ function SaveReport({ device }) {
         const url = URL.createObjectURL(new Blob([r.text || ""], { type: "text/plain" }));
         const link = document.createElement("a");
         link.href = url;
-        link.download = r.file || "hermes-gadget-diag.txt";
+        link.download = r.file || "herpots-diag.txt";
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -149,7 +149,7 @@ function DeviceTable({ devices }) {
   );
 }
 
-function GadgetsPage() {
+function HerPotsPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -198,7 +198,7 @@ function GadgetsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle>Gadgets</CardTitle>
+            <CardTitle>HerPots</CardTitle>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>Refresh</Button>
           </div>
           {data && (
@@ -213,8 +213,8 @@ function GadgetsPage() {
             {data && <GatewayNote gateway={data.gateway} count={devices.length} />}
             {data && !devices.length && (
               <p className="text-sm text-muted-foreground">
-                No gadgets have connected yet. Set up a board from the installer, then approve it
-                with <code>hermes gadget pair</code>.
+                No companions have connected yet. Set up a board from the installer, then approve it
+                with <code>hermes herpots pair</code>.
               </p>
             )}
             {devices.length > 0 && <DeviceTable devices={devices} />}
@@ -225,4 +225,4 @@ function GadgetsPage() {
   );
 }
 
-window.__HERMES_PLUGINS__.register("gadget", GadgetsPage);
+window.__HERMES_PLUGINS__.register("herpots", HerPotsPage);

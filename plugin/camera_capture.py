@@ -78,7 +78,7 @@ def save_camera_capture(result: dict[str, Any], device_id: str, root: str | Path
     directory = Path(root) if root is not None else Path.home() / ".hermes" / "gadgetpix"
     directory.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    safe_device = re.sub(r"[^A-Za-z0-9_-]+", "_", str(device_id)).strip("_") or "gadget"
+    safe_device = re.sub(r"[^A-Za-z0-9_-]+", "_", str(device_id)).strip("_") or "herpots"
     target = directory / f"{stamp}_{safe_device}.png"
     with tempfile.NamedTemporaryFile(prefix=".gadgetpix-", suffix=".tmp", dir=directory, delete=False) as temp:
         temp_path = Path(temp.name)

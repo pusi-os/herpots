@@ -36,15 +36,15 @@ provides_hooks:  # session state for the device's dashboard (dashboard.SessionBo
   - on_session_reset
   - pre_transcription  # the language gadget speech is transcribed in (stt.py, stt_language)
 optional_env:
-  - name: GADGET_ACCESS_TOKEN
+  - name: HERPOTS_ACCESS_TOKEN
     description: "Optional shared token every gadget must present (configure the same value on the device)"
     prompt: "Gadget access token (or empty)"
     password: true
-  - name: GADGET_ALLOWED_USERS
+  - name: HERPOTS_ALLOWED_USERS
     description: "Comma-separated device ids allowed without pairing (e.g. hg-0123456789abcdef)"
     prompt: "Allowed gadget device ids (or empty to use pairing codes)"
     password: false
-  - name: GADGET_ALLOW_ALL_USERS
+  - name: HERPOTS_ALLOW_ALL_USERS
     description: "Allow any gadget without pairing (development only)"
     prompt: "Allow all gadgets? (true/false)"
     password: false

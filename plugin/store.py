@@ -1,6 +1,6 @@
 """Durable device registry: enrolled device keys and pending pairing codes.
 
-Lives in the plugin's data directory (``<hermes home>/plugin-data/gadget/``),
+Lives in the plugin's data directory (``<hermes home>/plugin-data/herpots/``),
 never in the plugin install tree. Device keys are generated on the device and
 enrolled on first contact (trust on first use); later connections prove
 possession with an HMAC challenge, so the key crosses the network only once.

@@ -979,7 +979,7 @@ CONFIG_PARTITION_TABLE_MD5=y
 # Defaults (overridable from the serial console)
 #
 # default:
-CONFIG_HG_DEFAULT_NAME="Hermes Gadget"
+CONFIG_HG_DEFAULT_NAME="HerPots"
 # default:
 CONFIG_HG_DEFAULT_SERVER_URL=""
 # default:

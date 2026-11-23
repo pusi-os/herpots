@@ -1,10 +1,10 @@
 {
-  "name": "gadget",
-  "label": "Gadgets",
+  "name": "herpots",
+  "label": "HerPots",
   "description": "The HerPots companion devices this Hermes knows: board, firmware, last seen, online and battery",
   "icon": "Cpu",
   "tab": {
-    "path": "/gadget",
+    "path": "/herpots",
     "position": "end"
   },
   "entry": "dist/index.js",

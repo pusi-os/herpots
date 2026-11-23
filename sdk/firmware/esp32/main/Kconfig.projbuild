@@ -1,17 +1,17 @@
-menu "Hermes Gadget"
+menu "HerPots"
 
     menu "Defaults (overridable from the serial console)"
         config HG_DEFAULT_NAME
             string "Device name"
-            default "Hermes Gadget"
+            default "HerPots"
         config HG_DEFAULT_SERVER_URL
-            string "Hermes gadget endpoint"
+            string "HerPots endpoint"
             default ""
             help
-                ws://<hermes-host>:8765/gadget  (run 'hermes gadget info' on the host).
+                ws://<hermes-host>:8765/herpots  (run 'hermes herpots info' on the host).
                 Leave empty to configure it over serial: set server <url>
         config HG_DEFAULT_ACCESS_TOKEN
-            string "Access token (only if GADGET_ACCESS_TOKEN is set on the host)"
+            string "Access token (only if HERPOTS_ACCESS_TOKEN is set on the host)"
             default ""
         config HG_DEFAULT_WIFI_SSID
             string "Wi-Fi SSID"

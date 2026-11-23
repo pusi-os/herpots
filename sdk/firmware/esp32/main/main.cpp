@@ -1,4 +1,4 @@
-// Hermes Gadget firmware entry point: wires the ESP32 drivers to the portable
+// HerPots firmware entry point: wires the ESP32 drivers to the portable
 // core (hg::App) and runs the app loop on the main task.
 #include "port.hpp"  // first: pulls in FreeRTOS.h ahead of task.h/queue.h
 #include "port_cardputer.hpp"
@@ -386,7 +386,7 @@ extern "C" void app_main(void) {
   if (early_levels && board.expander_levels.power_hold) g_latch_power.board_power_off = [] { return hgp::expander_power_off(); };
 #endif
   const char* version = esp_app_get_description()->version;
-  ESP_LOGI(TAG, "Hermes Gadget %s on %s", version, board.name);
+  ESP_LOGI(TAG, "HerPots %s on %s", version, board.name);
 #if CONFIG_SPIRAM
 #if CONFIG_SPIRAM_MODE_OCT
   constexpr const char* kPsramMode = "octal";

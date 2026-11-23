@@ -1,4 +1,4 @@
-// Builds the Hermes dashboard's Gadgets tab: plugin/dashboard/src/index.jsx -> plugin/dashboard/dist/index.js.
+// Builds the HerPots dashboard tab: plugin/dashboard/src/index.jsx -> plugin/dashboard/dist/index.js.
 //
 //   npm run build:dashboard-tab           write dist/index.js
 //   node scripts/dashboard-tab.mjs --check   exit 1 when dist/index.js differs from a fresh build
