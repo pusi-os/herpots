@@ -6,6 +6,8 @@
 #include "hg/console_args.hpp"
 #include "hg/wifi_networks.hpp"
 
+#include "potsy/potsy_glue.hpp"
+
 namespace hg {
 
 bool App::settings_hold_live() const {

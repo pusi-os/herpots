@@ -972,7 +972,7 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# Hermes Gadget
+# HerPots
 #
 
 #
@@ -1033,7 +1033,7 @@ CONFIG_HG_BOARD_ZHENGCHEN_154=y
 # CONFIG_HG_BOARD_CROWPANEL_21 is not set
 # CONFIG_HG_BOARD_CROWPANEL_50 is not set
 # CONFIG_HG_BOARD_CUSTOM is not set
-# end of Hermes Gadget
+# end of HerPots
 
 #
 # Compiler options
