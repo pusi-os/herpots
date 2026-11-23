@@ -119,9 +119,11 @@ BoardConfig make() {
   b.lcd.swap_xy = true;
   b.lcd.mirror_x = false;
   b.lcd.mirror_y = true;
-  // The panel's active window sits ~1/4 width off the left edge (owner,
-  // verified on the device): gap_x shifts the picture right.
-  b.lcd.gap_x = 60;
+  // The panel's visible window is mounted at native rows ~60..319 (owner,
+  // verified on the device): gap_x=80 centers the picture and clears the
+  // battery indicator. Past 80 the native frame ends (320) and it wraps —
+  // 84 was tried and tore.
+  b.lcd.gap_x = 80;
   b.lcd.mosi = 10;
   b.lcd.sclk = 9;
   b.lcd.cs = 14;
