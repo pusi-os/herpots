@@ -7,9 +7,9 @@ ESP32-S3 устройство с экраном, микрофоном и дин�
 
 ```
 herpots/
-├── firmware/    прошивка (форк hermes-gadget-sdk, ESP-IDF + PlatformIO)
-├── plugin/      плагин Hermes (Python, kind: platform)
-└── docs/        состояние прошивки, план публикации
+├── sdk/firmware/  прошивка (форк hermes-gadget-sdk, ESP-IDF + PlatformIO)
+├── plugin/        плагин Hermes (Python, kind: platform)
+└── docs/          состояние прошивки, план публикации
 ```
 
 ## Что внутри
@@ -42,14 +42,14 @@ hermes plugins install pusi-os/herpots --subdir plugin
 Кубик (`xiaozhi-cube-154`), USB-JTAG:
 
 ```bash
-cd firmware/esp32
+cd sdk/firmware/esp32
 pio run -e xiaozhi-cube-154 -t upload --upload-port /dev/ttyACM0
 ```
 
 Zhengchen (`zhengchen-154`) — только в BOOT-режиме, одним вызовом esptool:
 
 ```bash
-cd firmware/esp32 && pio run -e zhengchen-154
+cd sdk/firmware/esp32 && pio run -e zhengchen-154
 /home/al/.platformio/penv/bin/esptool.py --chip esp32s3 --port /dev/ttyUSB0 \
   --baud 460800 --before usb-reset --after hard-reset write-flash -z \
   --flash-mode dio --flash-size 16MB --flash-freq 80m \
