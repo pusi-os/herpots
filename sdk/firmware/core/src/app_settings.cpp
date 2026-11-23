@@ -146,7 +146,8 @@ void App::settings_input(Button button, bool pressed) {
       console(touch_talk_ ? "set touch_talk off" : "set touch_talk on");
       break;
     case Menu::Profile:
-      if (!(profile_.touch_screen ? open_profile_picker() : next_agent_profile()))
+      // The grid is button-driven on boards without a touchscreen (UP/DOWN + TALK).
+      if (!open_profile_picker() && !profile_.touch_screen && !next_agent_profile())
         check_result_ = tr(i18n::Msg::ProfileCantSwitch);
       break;
     case Menu::ProfileGrid:

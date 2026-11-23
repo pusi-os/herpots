@@ -1096,12 +1096,16 @@ bool App::select_agent_profile(size_t index) {
 bool App::profile_name_hit(int x, int y) const { return ui_ && !display_sleeping_ && ui_->name_hit(model_, x, y); }
 
 bool App::open_profile_picker() {
-  if (!profile_.touch_screen || !can_switch_profile()) return false;
+  if (!can_switch_profile()) return false;
   if (settings_open()) close_settings();
   overlay_ = Overlay::Profiles;
   overlay_until_ = 0;
   profile_page_ = 0;
   notice_.clear();
+  // The button cursor starts on the current profile.
+  size_t cur = 0;
+  while (cur < agent_profiles_.size() && agent_profiles_[cur].id != agent_profile_) ++cur;
+  profile_cursor_ = static_cast<int16_t>(cur < agent_profiles_.size() ? cur : 0);
   update_model();
   // Open at the page that holds the current profile; the page size is the grid that fits this panel.
   size_t i = 0;
@@ -1130,6 +1134,28 @@ bool App::profile_page_step(int dir) {
   profile_page_ = page * per;
   update_model();
   return true;
+}
+
+bool App::profile_cursor_move(int dir) {
+  if (!profile_picker_open() || agent_profiles_.empty()) return false;
+  const int n = static_cast<int>(agent_profiles_.size()) + 1;  // + the Settings cell
+  profile_cursor_ = static_cast<int16_t>((profile_cursor_ + dir + n) % n);
+  const int per = ui_ ? ui_->profile_per_page(model_) : 0;
+  if (per > 0) profile_page_ = profile_cursor_ / per * per;
+  update_model();
+  return true;
+}
+
+void App::profile_cursor_select() {
+  if (!profile_picker_open()) return;
+  if (profile_cursor_ >= static_cast<int>(agent_profiles_.size())) {  // the Settings cell
+    dismiss_overlay();
+    open_settings();
+    return;
+  }
+  if (select_agent_profile(static_cast<size_t>(profile_cursor_))) return;
+  // The cursor sat on the current profile: just close.
+  dismiss_overlay();
 }
 
 bool App::widgets_can_open() const {
@@ -1951,6 +1977,7 @@ void App::on_button(Button button, bool pressed, bool touch) {
     case Button::Talk:
       if (pressed) {
         if (cancel_held_) return;  // wait for the local settings chord
+        if (overlay_ == Overlay::Profiles) return;  // the grid's TALK selects on release
         // Before the connection check: a recording held through a lost connection still ends.
         if (mode_ == Mode::Listening) {
           if (hands_free_) finish_listening();
@@ -1967,6 +1994,8 @@ void App::on_button(Button button, bool pressed, bool touch) {
           break;
         }
         start_listening(talk_mode_ == TalkMode::Tap);
+      } else if (overlay_ == Overlay::Profiles) {
+        profile_cursor_select();  // the grid's TALK picks the cursor's profile
       } else if (mode_ == Mode::Listening && !hands_free_) {
         if (now() - mode_since_ < kMinUtteranceMs) {
           cancel_listening("too short");
@@ -2010,7 +2039,35 @@ void App::on_button(Button button, bool pressed, bool touch) {
       break;
     case Button::Up:
     case Button::Down:
-      if (!pressed) break;
+      if (overlay_ == Overlay::Profiles) {
+        // The grid walks by button: UP/DOWN move the cursor across profiles and the Settings cell.
+        if (pressed) profile_cursor_move(button == Button::Up ? -1 : +1);
+        return;
+      }
+      if (!pressed) {
+        // UP's release decides what its press meant on the Ready screen: a quick press opened
+        // the profile grid, a held one brings the last reply back.
+        if (button == Button::Up && up_down_at_ && mode_ == Mode::Idle && overlay_ == Overlay::None &&
+            agent_profiles_.size() > 1 && !settings_open() && !widgets_open()) {
+          const bool quick = now() - up_down_at_ < 700;
+          up_down_at_ = 0;
+          if (quick) open_profile_picker();
+          else {
+            page_at_ = now() + kManualScrollPauseMs;
+            (void)show_reply_text();
+          }
+          return;
+        }
+        up_down_at_ = 0;
+        break;
+      }
+      if (button == Button::Up && mode_ == Mode::Idle && overlay_ == Overlay::None &&
+          agent_profiles_.size() > 1 && !settings_open() && !widgets_open() && !choice_showing() &&
+          !prompt_showing()) {
+        up_down_at_ = now();  // the release decides: quick = the profile grid, held = the last reply
+        return;
+      }
+      up_down_at_ = 0;
       if (choice_showing()) choice_move(button == Button::Up ? -1 : +1, false);
       if (prompt_showing()) break;
       if (show_reply_text()) return;
@@ -3135,7 +3192,8 @@ void App::update_model() {
     for (size_t i = 0; i < agent_profiles_.size(); ++i) {
       const AgentProfile& p = agent_profiles_[i];
       const bool current = p.id == agent_profile_;
-      m.dash.push_back({p.name, p.id, current ? DashRow::Tone::Waiting : DashRow::Tone::Dim});
+      const bool cursor = static_cast<int>(i) == profile_cursor_;
+      m.dash.push_back({p.name, p.id, cursor ? DashRow::Tone::Busy : current ? DashRow::Tone::Waiting : DashRow::Tone::Dim});
       // The icon: the face the device holds for the current profile, the mascot for the default
       // one (which wears it when it has no face of its own); an initial for the rest.
       if (current && face_) m.face_row = static_cast<int16_t>(i);

@@ -205,6 +205,10 @@ class App {
   // the page, a tap on a profile asks for it, and CANCEL (swipe down) closes it.
   bool profile_name_hit(int x, int y) const;
   bool open_profile_picker();
+  // Button navigation of the profile grid (boards without a touchscreen):
+  // the cursor walks profile cells plus the Settings cell; TALK selects.
+  bool profile_cursor_move(int dir);
+  void profile_cursor_select();
   // Whether a sideways swipe that starts now opens the grid: the Ready screen, with profiles to switch to.
   bool profile_swipe_opens() const;
   // Turns the grid's page: +1 the next, -1 the previous, wrapping around.
@@ -644,6 +648,8 @@ class App {
                               WakeTalk, Animation, SdLog, Back };
   enum class HardwareCheck : uint8_t { None, Microphone, Speaker, Display, Inputs };
   Menu menu_ = Menu::Closed;
+  int16_t profile_cursor_ = 0;   // the profile grid's button cursor; the last cell is Settings
+  uint32_t up_down_at_ = 0;      // UP press time on the Ready screen: quick = profile grid, held = last reply
   // The settings list's scroll in pixels, and where it eases to. It follows the
   // selected row until a drag moves it by hand, and again once the selection moves.
   int settings_scroll_ = 0, settings_target_ = 0;
