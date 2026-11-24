@@ -46,4 +46,7 @@ void cycle_outfit(bool forward);
 void select_outfit(uint8_t index);
 const char* outfit_label();
 
+// The current background's name (the settings row's body): one label per value.
+const char* background_label();
+
 }  // namespace potsy_glue

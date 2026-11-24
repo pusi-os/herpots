@@ -508,8 +508,7 @@ void App::settings_item(Menu item, UiModel& m) const {
       break;
     case Menu::Background:
       m.detail = tr(Msg::BackgroundSetting);
-      m.body = std::string(potsy_glue::background_is_rain() ? tr(Msg::BackgroundDigitalRain) : tr(Msg::BackgroundSimple)) +
-               "\n" + tr(Msg::ChangesSaved);
+      m.body = std::string(potsy_glue::background_label()) + "\n" + tr(Msg::ChangesSaved);
       break;
     case Menu::TalkMode:
       m.detail = tr(Msg::TalkMode);

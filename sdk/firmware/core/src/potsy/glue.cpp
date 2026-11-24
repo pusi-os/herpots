@@ -13,8 +13,6 @@ FastSprite* g_frameSprite = nullptr;
 
 namespace potsy_glue {
 
-void set_storage(hg::Storage* store) { potsy_prefs::use_storage(store); }
-
 // The fork's cosmetics are free from the first boot: the outfit cycle in the
 // settings menu and the persona message from Hermes must be able to pick any
 // costume. PotsCharm gates outfits behind lifetime stats; seeding the master
@@ -27,6 +25,14 @@ void seed_unlock() {
     if (!potsy_prefs::read("allOutfits")) potsy_prefs::write("allOutfits", "1");
   }
 }
+
+void set_storage(hg::Storage* store) {
+  potsy_prefs::use_storage(store);
+  // Before the first prefs load: Potsy's loadPrefs runs after App's constructor
+  // (trigger BOOTED), so seeding here lands in RAM on the very first boot.
+  seed_unlock();
+}
+
 
 // A distinguishable solid for every non-DIGITAL value: eleven identical
 // fills read as a stuck switch (the old behaviour), and dark tints keep the
@@ -73,6 +79,26 @@ void cycle_outfit(bool forward) {
 void select_outfit(uint8_t index) { seed_unlock(); Potsy::selectOutfit(index); }
 
 const char* outfit_label() { return Potsy::outfitName(); }
+
+// The background's own name, for the settings row: all eleven non-rain values
+// drew as one undistinguishable fill, so the row body must name the value.
+const char* background_label() {
+  const bool ru = Settings::lang() != 0;
+  switch (Settings::background()) {
+    case Settings::Background::DIGITAL:   return ru ? "Цифровой дождь" : "Digital rain";
+    case Settings::Background::STARFIELD: return ru ? "Звёздное небо" : "Starfield";
+    case Settings::Background::TOASTERS:  return ru ? "Тостеры" : "Toasters";
+    case Settings::Background::AQUARIUM:  return ru ? "Аквариум" : "Aquarium";
+    case Settings::Background::TERMINAL:  return ru ? "Терминал" : "Terminal";
+    case Settings::Background::FIREFLIES: return ru ? "Светлячки" : "Fireflies";
+    case Settings::Background::FIRE:      return ru ? "Огонь" : "Fire";
+    case Settings::Background::SNOWFALL:  return ru ? "Снегопад" : "Snowfall";
+    case Settings::Background::SPECTRUM:  return ru ? "Спектр" : "Spectrum";
+    case Settings::Background::TUNNEL:    return ru ? "Тоннель" : "Tunnel";
+    case Settings::Background::SYNTHWAVE: return ru ? "Синтвейв" : "Synthwave";
+    default:                              return ru ? "Чёрный" : "Black";
+  }
+}
 
 void draw_hero(hg::Canvas& c, int cx, int top_y, int avail_h, uint32_t now_ms, bool talking) {
   static uint32_t last_now = 0;
