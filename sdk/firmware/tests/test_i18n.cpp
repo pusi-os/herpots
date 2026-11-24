@@ -40,7 +40,7 @@ std::string placeholders(std::string_view s) {
 
 TEST("i18n: every language has a code, a name and parses back") {
   CHECK(hg::i18n::parse("en") == Lang::En);
-  CHECK(hg::i18n::parse("es") == Lang::Es);
+  CHECK(hg::i18n::parse("ru") == Lang::Ru);
   CHECK(!hg::i18n::parse("xx"));
   CHECK(!hg::i18n::parse(""));
   CHECK(!hg::i18n::parse("EN"));
@@ -62,7 +62,7 @@ TEST("i18n: every language has a code, a name and parses back") {
 TEST("i18n: English is the catalogue's own text, and other languages fall back to it") {
   CHECK_EQ(std::string(hg::i18n::text(Lang::En, Msg::Ready)), std::string("Ready"));
   CHECK_EQ(std::string(hg::i18n::english(Msg::HiImHermes)), std::string("Hi, I'm Hermes"));
-  CHECK_EQ(std::string(hg::i18n::text(Lang::Es, Msg::Ready)), std::string("Listo"));
+  CHECK_EQ(std::string(hg::i18n::text(Lang::Ru, Msg::Ready)), std::string("Готов"));
   for (Msg m : all_messages()) {
     // Every message reads as something, in every language.
     for (size_t l = 0; l < hg::i18n::kLangCount; ++l) CHECK(*hg::i18n::text(static_cast<Lang>(l), m));
@@ -102,8 +102,8 @@ TEST("i18n: drawn text is in the font: ASCII and Latin-1, as written") {
     }
   }
   // Written with its accents and drawn with them.
-  CHECK_EQ(std::string(hg::i18n::text(Lang::Es, Msg::DeviceInfo)), std::string("Información"));
-  CHECK_EQ(std::string(hg::i18n::text(Lang::Es, Msg::ToneFinished)), std::string("Tono terminado. ¿Lo oíste?"));
+  CHECK_EQ(std::string(hg::i18n::text(Lang::Ru, Msg::DeviceInfo)), std::string("Об устройстве"));
+  CHECK_EQ(std::string(hg::i18n::text(Lang::Ru, Msg::ToneFinished)), std::string("Тон закончился. Слышал?"));
 }
 
 TEST("i18n: weekday and month names are at most 3 columns in every language") {
@@ -166,9 +166,9 @@ TEST("i18n: format fills placeholders in any order and keeps the ones it has no 
 TEST("i18n: control names in words are translated, printed button names are kept") {
   using hg::i18n::control_name;
   CHECK_EQ(control_name(Lang::En, "Swipe down"), std::string("Swipe down"));
-  CHECK_EQ(control_name(Lang::Es, "Swipe down"), std::string("Desliza"));
-  CHECK_EQ(control_name(Lang::Es, "BOOT"), std::string("BOOT"));
-  CHECK_EQ(control_name(Lang::Es, "PWR"), std::string("PWR"));
+  CHECK_EQ(control_name(Lang::Ru, "Swipe down"), std::string("Свайп вниз"));
+  CHECK_EQ(control_name(Lang::Ru, "BOOT"), std::string("BOOT"));
+  CHECK_EQ(control_name(Lang::Ru, "PWR"), std::string("PWR"));
 }
 
 namespace {

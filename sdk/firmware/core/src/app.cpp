@@ -2010,15 +2010,17 @@ void App::on_button(Button button, bool pressed, bool touch) {
           if (hands_free_) finish_listening();
           return;
         }
-        if (!can_talk()) {
-          set_hint_flash(tr(phase_ == Phase::Online ? i18n::Msg::ApprovePairingFirst : i18n::Msg::NotConnected));
-          return;
-        }
+        // A question is answered before the pairing gate: it is a reply to something already on
+        // screen, and its YES must not be refused for the same reason its NO is allowed.
         if (prompt_showing()) {
           if (choice_showing()) {  // TALK picks the highlighted answer; a touch picks by its place
             if (!touch && choice_keys() && choice_armed(now())) answer_choice(choice_sel_);
           } else if (prompt_armed(now())) answer_prompt(true);
           break;
+        }
+        if (!can_talk()) {
+          set_hint_flash(tr(phase_ == Phase::Online ? i18n::Msg::ApprovePairingFirst : i18n::Msg::NotConnected));
+          return;
         }
         start_listening(talk_mode_ == TalkMode::Tap);
       } else if (overlay_ == Overlay::Profiles) {

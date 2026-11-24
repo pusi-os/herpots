@@ -127,7 +127,7 @@ TEST("clock face: the face's ink keeps 3 px clear of the clock ring at every shi
     };
     bool saw_time = false, saw_date = false, saw_dot = false;
     for (int minute = 0; minute < 60; ++minute) {
-      hg::UiModel m = clock_model(static_cast<uint8_t>(minute), "MI\xC3\x89 30 SEPT", hg::i18n::Lang::Es);
+      hg::UiModel m = clock_model(static_cast<uint8_t>(minute), "MI\xC3\x89 30 SEPT", hg::i18n::Lang::Ru);
       m.clock_time = "23:58";
       f.ui.render(m);
       for (int y = 0; y < t.w; ++y)
@@ -197,7 +197,7 @@ TEST("clock face: small panels keep the time and drop the mascot") {
 TEST("clock face: the Spanish date draws whole") {
   Face f(466, 466, true);
   const std::string date = "S\xC3\x81" "B 24 OCT";  // SÁB 24 OCT
-  f.ui.render(clock_model(41, date, hg::i18n::Lang::Es));
+  f.ui.render(clock_model(41, date, hg::i18n::Lang::Ru));
   // The date's grey is the ring's tick grey too, so the box looks only well inside the band.
   Box d;
   const int limit = 219 - 8;  // the band's inner edge on 466, less the ring's reach

@@ -1705,6 +1705,25 @@ TEST("app: a question from Hermes shows the mascot with TALK/CANCEL answers") {
   CHECK(r.app.screen() == hg::Screen::Thinking);
 }
 
+TEST("app: a question sent to an unpaired device is still answered by TALK") {
+  // The pairing gate must not swallow the answer: declining works through CANCEL, which skips
+  // `can_talk()`, while TALK checked it first and only flashed "approve pairing first" — so the
+  // user could say no but never yes.
+  Rig r;
+  r.bring_online(true);
+  r.server(R"({"type":"prompt","id":"q5","title":"Allow command?","text":"rm -rf build"})");
+  r.advance(700);
+  CHECK(r.app.screen() == hg::Screen::Prompt);
+  // The screen went away and the device is not paired any more while the question stands: the
+  // answer must still go out, exactly as a NO does.
+  r.server(R"({"type":"welcome","session":"s1","heartbeat_s":20,"paired":false})");
+  r.app.on_button(hg::Button::Talk, true);
+  r.app.on_button(hg::Button::Talk, false);
+  const Value* reply = r.fake.last("prompt.reply");
+  CHECK(reply != nullptr);
+  if (reply) CHECK_EQ((*reply)["answer"].as_string(), std::string("yes"));
+}
+
 TEST("app: CANCEL answers no and holding it does not start a new session") {
   Rig r;
   r.bring_online(true);
@@ -5251,13 +5270,13 @@ TEST("language: English by default, and set language switches the device's own t
   CHECK_EQ(r.app.model().headline, std::string("Hi, I'm Hermes"));
   CHECK_EQ(r.app.model().hint, std::string("hold TALK to talk"));
   CHECK(r.app.model().lang == hg::i18n::Lang::En);
-  CHECK_EQ(r.app.console("set language es"), std::string("@ok language"));
-  CHECK_EQ(r.fake.kv["language"], std::string("es"));
-  CHECK(r.app.model().lang == hg::i18n::Lang::Es);
-  CHECK_EQ(r.app.model().headline, std::string("Hola, soy Hermes"));
-  CHECK_EQ(r.app.model().detail, std::string("Pregúntame algo"));  // drawn with its accent (Latin-1 font)
-  CHECK_EQ(r.app.model().hint, std::string("mantén TALK y habla"));
-  CHECK_EQ(r.app.console("get language"), std::string(R"(@value {"key":"language","value":"es"})"));
+  CHECK_EQ(r.app.console("set language ru"), std::string("@ok language"));
+  CHECK_EQ(r.fake.kv["language"], std::string("ru"));
+  CHECK(r.app.model().lang == hg::i18n::Lang::Ru);
+  CHECK_EQ(r.app.model().headline, std::string("Я, Хер Потс - чем помочь?"));
+  CHECK_EQ(r.app.model().detail, std::string("Спроси о чём угодно"));
+  CHECK_EQ(r.app.model().hint, std::string("держи TALK, чтобы говорить"));
+  CHECK_EQ(r.app.console("get language"), std::string(R"(@value {"key":"language","value":"ru"})"));
   // An empty value goes back to English.
   CHECK_EQ(r.app.console("set language"), std::string("@ok language"));
   CHECK_EQ(r.app.model().headline, std::string("Hi, I'm Hermes"));
@@ -6169,15 +6188,15 @@ void welcome_with_language(Rig& r, const std::string& language) {
 TEST("language: auto follows the language Hermes names in welcome") {
   Rig r;
   r.fake.kv["language"] = "auto";
-  welcome_with_language(r, "es");
-  CHECK(r.app.model().lang == hg::i18n::Lang::Es);
-  CHECK_EQ(r.app.model().headline, std::string("Hola, soy Hermes"));
+  welcome_with_language(r, "ru");
+  CHECK(r.app.model().lang == hg::i18n::Lang::Ru);
+  CHECK_EQ(r.app.model().headline, std::string("Я, Хер Потс - чем помочь?"));
   // A region or script falls back to its language; case and underscores don't matter.
-  for (const char* id : {"es-mx", "ES_MX", "es-419"}) {
+  for (const char* id : {"ru-RU", "RU_RU", "ru-419"}) {
     Rig other;
     other.fake.kv["language"] = "auto";
     welcome_with_language(other, id);
-    CHECK(other.app.model().lang == hg::i18n::Lang::Es);
+    CHECK(other.app.model().lang == hg::i18n::Lang::Ru);
   }
 }
 
@@ -6193,11 +6212,11 @@ TEST("language: auto is English when Hermes names none, or one this firmware lac
 
 TEST("language: a chosen language ignores Hermes's, and auto picks it up when chosen later") {
   Rig r;  // English by default: welcome doesn't change it
-  welcome_with_language(r, "es");
+  welcome_with_language(r, "ru");
   CHECK(r.app.model().lang == hg::i18n::Lang::En);
   r.fake.kv["language"] = "en";
   CHECK_EQ(r.app.console("set language auto"), std::string("@ok language"));
-  CHECK(r.app.model().lang == hg::i18n::Lang::Es);  // remembered from this connection's welcome
+  CHECK(r.app.model().lang == hg::i18n::Lang::Ru);  // remembered from this connection's welcome
   CHECK_EQ(r.app.console("set language en"), std::string("@ok language"));
   CHECK(r.app.model().lang == hg::i18n::Lang::En);
 }
@@ -6205,8 +6224,8 @@ TEST("language: a chosen language ignores Hermes's, and auto picks it up when ch
 TEST("language: a later welcome with another language switches an auto device") {
   Rig r;
   r.fake.kv["language"] = "auto";
-  welcome_with_language(r, "es");
-  CHECK(r.app.model().lang == hg::i18n::Lang::Es);
+  welcome_with_language(r, "ru");
+  CHECK(r.app.model().lang == hg::i18n::Lang::Ru);
   r.app.on_transport_closed("bye");
   r.advance(3000);
   r.app.on_transport_open();
@@ -6217,12 +6236,12 @@ TEST("language: a later welcome with another language switches an auto device") 
 
 TEST("language: the agent can set auto through screen.language") {
   Rig r;
-  welcome_with_language(r, "es");
+  welcome_with_language(r, "ru");
   r.server(R"({"type":"action","id":"l9","name":"screen.language","args":{"language":"auto"}})");
   const Value* res = r.fake.last("action.result");
   CHECK(res && (*res)["ok"].as_bool() && (*res)["result"]["language"].as_string() == "auto");
   CHECK_EQ(r.fake.kv["language"], std::string("auto"));
-  CHECK(r.app.model().lang == hg::i18n::Lang::Es);
+  CHECK(r.app.model().lang == hg::i18n::Lang::Ru);
 }
 
 namespace {
