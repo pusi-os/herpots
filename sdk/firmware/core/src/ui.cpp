@@ -1520,6 +1520,9 @@ void Ui::draw_profiles(Canvas& c, const UiModel& m) {
     const int item = g.first + i;
     const DashRow& row = m.dash[static_cast<size_t>(item)];
     const bool current = row.tone == DashRow::Tone::Waiting;
+    // The button cursor (boards without a touchscreen): a blue ring, distinct
+    // from the current profile's accent ring.
+    const bool cursor = row.tone == DashRow::Tone::Busy;
     // A margin of two dots each side, so the names of cells side by side never touch.
     const std::vector<std::string> lines = name_lines(row.label, cols_for(r.w - 4 * s, ls));
     const int block = g.icon + 2 * s + static_cast<int>(lines.size()) * lh;
@@ -1543,9 +1546,11 @@ void Ui::draw_profiles(Canvas& c, const UiModel& m) {
       c.text(cx - Canvas::text_width(letter, big) / 2, cy - font::kGlyphHeight * big / 2, letter, big, kText);
     }
     if (current) c.ring(cx, cy, g.icon / 2 + s + 1, std::max(2, s), kAccent);
+    if (cursor) c.ring(cx, cy, g.icon / 2 + 3 * s + 1, std::max(2, s), kBlue);
     int ty = iy + g.icon + 2 * s;
     for (const std::string& line : lines) {
-      c.text(r.x + (r.w - Canvas::text_width(line, ls)) / 2, ty + (lh - glyph_h) / 2, line, ls, current ? kAccent : kText);
+      c.text(r.x + (r.w - Canvas::text_width(line, ls)) / 2, ty + (lh - glyph_h) / 2, line, ls,
+             current ? kAccent : cursor ? kBlue : kText);
       ty += lh;
     }
   }
