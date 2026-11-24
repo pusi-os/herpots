@@ -19,10 +19,15 @@ void set_storage(hg::Storage* store);
 // caption band below him, never in the bubble.
 void draw_hero(hg::Canvas& c, int cx, int top_y, int avail_h, uint32_t now_ms, bool talking);
 
-// Paints the hero band's backdrop. True when it drew (the DIGITAL rain);
-// false when the caller should fill its own background instead. The rain is
-// a pure function of `now_ms`, so banded framebuffer redraws agree.
+// Paints the hero band's backdrop. Always true (it drew): DIGITAL is the
+// rain, the other values are distinguishable dark solids. The rain is a pure
+// function of `now_ms`, so banded framebuffer redraws agree.
 bool paint_background(hg::Canvas& c, int x, int y, int w, int h, uint32_t now_ms);
+
+// A small standing cameo for screens that want him without the state
+// machine (the clock face's avatar slot): feet on `base_y`, height about
+// 58*scale px, idle bob only, no speech bubble.
+void draw_mini_hero(hg::Canvas& c, int cx, int base_y, uint32_t now_ms, float scale);
 
 // rain.cpp: the rain renderer paint_background() delegates to.
 bool paint_rain(hg::Canvas& c, int x, int y, int w, int h, uint32_t now_ms);

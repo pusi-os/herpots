@@ -2807,7 +2807,15 @@ void Ui::draw_clock(const UiModel& m) {
       }
     }
 
-    if (face_y >= 0) draw_face(panel, cx + dx - face.size / 2, face_y + dy, face, m.face, kText);
+    if (face_y >= 0) {
+      // The profile's Hermes avatar, or — for Potsy builds — the same Potsy
+      // as the hero band, sized to the avatar's slot: same character, smaller.
+      if (m.potsy)
+        potsy_glue::draw_mini_hero(panel, cx + dx, face_y + face.size + dy, m.now_ms,
+                                   face.size / 64.0f * 0.9f);
+      else
+        draw_face(panel, cx + dx - face.size / 2, face_y + dy, face, m.face, kText);
+    }
     panel.text(cx + dx - Canvas::text_width(m.clock_time, k) / 2, time_y + dy, m.clock_time, k, kText);
     if (Canvas::text_width(m.clock_date, ds) <= avail(date_y, date_y + Canvas::line_height(ds)))
       panel.text(cx + dx - Canvas::text_width(m.clock_date, ds) / 2, date_y + dy, m.clock_date, ds, kDim);
