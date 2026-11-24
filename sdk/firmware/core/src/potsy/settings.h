@@ -18,11 +18,9 @@ namespace Settings {
 
     enum class Background : uint8_t {
         DIGITAL = 0, STARFIELD = 1, TOASTERS = 2,
-        AQUARIUM = 3, TERMINAL = 4, FIREFLIES = 5,
-        FIRE = 6, SNOWFALL = 7, SPECTRUM = 8,
-        TUNNEL = 9, SYNTHWAVE = 10, BLACK = 11
+        FIREFLIES = 3, BLACK = 4
     };
-    static constexpr uint8_t BACKGROUND_COUNT = 12;
+    static constexpr uint8_t BACKGROUND_COUNT = 5;
 
     // DIGITAL is the DIGITAL-rain renderer (potsy glue's rain.cpp); the other
     // values are their own animated scenes (the paint_* renderers in

@@ -335,48 +335,6 @@ namespace Potsy {
     // stands on him wants this one.
     int crownY();
 
-    // WOLF PELT is the one outfit not earned by a detection count --
-    // main.cpp calls this when the werewolf easter egg on the FIRE
-    // background is summoned. Persists immediately; a no-op once it has
-    // already been earned, so re-summoning does not re-announce it.
-    void unlockWolfPelt();
-
-    // CHROME WING is the second outfit not earned by a detection count --
-    // main.cpp calls this when the player catches the rare gold toaster on
-    // the TOASTERS background. Persists immediately; a no-op once earned.
-    void unlockChromeWing();
-
-    // VOID EYE is the third. main.cpp calls this when the player catches two
-    // eyes in a row on the STARFIELD background -- see Theme::consumeEyeCatch().
-    // Persists immediately; a no-op once earned.
-    void unlockVoidEye();
-
-    // PARKA is the fourth event unlock. main.cpp calls this after five taps on
-    // the lodge on the SNOWFALL background -- see Theme::consumeLodgeKnock().
-    void unlockParka();
-
-    // The Aquarium shark, caught on his return pass. Unlike the four above,
-    // calling this when the costume is ALREADY unlocked is not a no-op: he
-    // reacts anyway, because the catch is the game and a silent second catch
-    // teaches you to stop playing it.
-    void unlockShark();
-    // YZZERD is the sixth. main.cpp passes on Theme::consumeXyzzy(): how many
-    // times in a row XYZZY has been tapped on the TERMINAL background. One
-    // and two get "nothing happens"; three unlocks the outfit.
-    void magicWord(uint8_t said);
-    // SHAMBLER: main.cpp calls this when the owl on the FIRE background is
-    // tapped while it asks WHAT REEKS?! -- see Theme::consumeOwlReek(). Not a
-    // no-op once earned: he answers the owl either way.
-    void unlockShambler();
-    // Whether the SHAMBLER is wearable (earned, or the master unlock). The
-    // owl stops asking WHAT REEKS?! once it is -- see Theme::setOwlAsks().
-    bool shamblerUnlocked();
-    // TH3 0N3: main.cpp calls this when the one red glyph in the DIGITAL rain
-    // is tapped -- see Theme::consumeRedGlyph().
-    void unlockTh3();
-    // Whether TH3 0N3 is wearable. The rain stops sending its red glyph once
-    // it is -- see Theme::setRedGlyph().
-    bool th3Unlocked();
     // Whether he is wearing it right now (the payphone rings for him).
     bool th3Wearing();
     // The main screen, every frame: whether something serious is nearby. His

@@ -1,6 +1,7 @@
 // Generated from plugin/dashboard/src/index.jsx. Do not edit.
+
 (() => {
-  // ../../plugin/dashboard/src/index.jsx
+  // ../dashboard/src/index.jsx
   var SDK = window.__HERMES_PLUGIN_SDK__;
   var React = SDK.React;
   var { useCallback, useEffect, useState } = SDK.hooks;
@@ -26,32 +27,18 @@
     "ТЕНЬ",
     "САНТЕХНИК",
     "ВЫСОКИЙ БРАТ",
-    "КОСМОС",
     "СИНИЙ ВИХРЬ",
     "КАПИТАН",
-    "ВОЛЧЬЯ ШКУРА",
     "ХРОМОВОЕ КРЫЛО",
     "ГЛАЗ ПУСТОТЫ",
     "ЗИМНЯЯ ПАРКА",
-    "КОСТЮМ АКУЛЫ",
-    "ЙЗЗЕРД",
-    "СВЫШЕ 9000",
-    "ШАМБЛЕР",
-    "TH3 0N3",
-    "ПОЛОСКИ"
+    "TH3 0N3"
   ];
   var BACKGROUNDS = [
     "ЦИФРОВОЙ ДОЖДЬ",
     "ЗВЁЗДНОЕ НЕБО",
     "ТОСТЕРЫ",
-    "АКВАРИУМ",
-    "ТЕРМИНАЛ",
     "СВЕТЛЯЧКИ",
-    "ОГОНЬ",
-    "СНЕГОПАД",
-    "СПЕКТР",
-    "ТОННЕЛЬ",
-    "СИНТВЕЙВ",
     "ЧЁРНЫЙ"
   ];
   function errorText(err) {
