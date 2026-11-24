@@ -3201,7 +3201,8 @@ void App::update_model() {
     }
     // The last cell opens Settings: it pages like a profile, and is never the current one.
     m.settings_row = static_cast<int16_t>(m.dash.size());
-    m.dash.push_back({tr(Msg::Settings), std::string(), DashRow::Tone::Dim});
+    const bool settings_cursor = static_cast<int>(agent_profiles_.size()) == profile_cursor_;
+    m.dash.push_back({tr(Msg::Settings), std::string(), settings_cursor ? DashRow::Tone::Busy : DashRow::Tone::Dim});
     m.hint = tr(Msg::ProfileListHint);
     if (thumb_px_) {  // the profiles' own faces, where Hermes sent them
       m.thumb_px = static_cast<uint16_t>(thumb_px_);
