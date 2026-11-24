@@ -75,6 +75,8 @@ from gateway.platforms.event import MessageEvent, MessageType
 from . import audio as gaudio
 from . import botchat, compat, dashboard, imaging, interpret, ota, runtime, stt, textfmt
 from . import diag as gdiag
+from . import pairing_mirror
+from . import profile_routes as profile_routes_mod
 from . import persona as persona_store
 from . import protocol
 from .desk import Desk
@@ -553,10 +555,43 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
         the default profile but a route sends elsewhere (``_owner_trusts`` refuses it)."""
         return "routed" if self._store.owner_bound(session.device_id) and self._routed(session) else None
 
+    def _approve_everywhere(self, device_id: str, user_name: str) -> None:
+        """One approval is every bot's: see pairing_mirror for why."""
+        runner = getattr(self, "gateway_runner", None)
+        pairing_mirror.approve_everywhere(PLATFORM_NAME, device_id, user_name,
+                                          getattr(runner, "pairing_stores", None), self.name)
+
+    def _sync_device_route(self, session: DeviceSession) -> None:
+        """Point the gateway's live route table at the bot this device talks to.
+
+        The multiplexed gateway admits a device request under the profile a ROUTE names — a
+        source.profile the adapter stamps is ignored there, and without a route the first request
+        under the new bot dies as ``profile_mismatch``. Back to the default bot: the route goes,
+        the primary owner's own scope admits it.
+        """
+        runner = getattr(self, "gateway_runner", None)
+        config = getattr(runner, "config", None)
+        routes = getattr(config, "profile_routes", None)
+        if routes is None or not hasattr(config, "profile_routes"):
+            return  # not a multiplexed runner, or a config this cannot touch
+        try:
+            from gateway.profile_routing import ProfileRoute
+        except Exception:
+            logger.warning("[%s] cannot route %s to %s: ProfileRoute unavailable",
+                           self.name, session.device_id, session.profile, exc_info=True)
+            return
+        config.profile_routes = profile_routes_mod.sync_routes(
+            list(routes), PLATFORM_NAME, session.device_id, session.profile, ProfileRoute)
+
     def _routed(self, session: DeviceSession) -> bool:
-        """A ``gateway.profile_routes`` entry matches this device (Hermes may also reject it)."""
+        """An operator's ``gateway.profile_routes`` entry matches this device (Hermes may also reject it).
+        The routes this adapter manages for the device's own switching never count."""
         source = self._routed_source(session)
-        return source.profile is not None or source.profile_route_rejected is True
+        if source.profile_route_rejected is True:
+            return True
+        runner = getattr(self, "gateway_runner", None)
+        routes = getattr(getattr(runner, "config", None), "profile_routes", None)
+        return profile_routes_mod.operator_routed(routes, PLATFORM_NAME, session.device_id)
 
     def _switching_on(self) -> bool:
         """Only the default profile's ``extra.profiles`` turns switching on; another profile's listener
@@ -610,6 +645,12 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
             return "unpaired"
         session.profile = profile
         logger.info("[%s] %s now talks to profile %s", self.name, session.device_id, profile)
+        # A device paired with the default profile runs under any bot without a second pairing
+        # round; older pairings predate the mirroring, so this switch catches them up too.
+        await asyncio.to_thread(self._approve_everywhere, session.device_id, session.name)
+        # And the gateway's route table names this bot, so the device's next request is admitted
+        # under it (the runtime profile is resolved from routes alone, never from source.profile).
+        self._sync_device_route(session)
         # A hello-time switch happens before the welcome; on_ready sends the look then, so only
         # one already welcomed is told here: the device draws the profile it just switched to.
         if session.welcomed and session.paired:
@@ -799,6 +840,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
                 state = None
             await session.send_interpret(state.message() if state is not None else interpret.OFF)
             await self._interpret_release(session)  # a question asked, and messages pushed, while it was away
+            self._sync_device_route(session)  # the route table is memory-only: re-point it after a restart
             await self._send_persona(session)  # the profile's look, in case it changed while it was away
             await self._push_dashboard(session)
             return
@@ -855,6 +897,8 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
             self._store.clear_pairing(session.device_id)
             await session.set_paired(True)
             logger.info("[%s] device %s approved", self.name, session.device_id)
+            await asyncio.to_thread(self._approve_everywhere, session.device_id, session.name)
+            self._sync_device_route(session)
             await self._claim_home(session)
             await self._push_dashboard(session)
         elif not verdict:
