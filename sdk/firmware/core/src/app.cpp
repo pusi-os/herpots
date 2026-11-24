@@ -62,6 +62,8 @@ constexpr uint32_t kNewSessionHintMs = 600;   // ...and show the countdown after
 // throw the answer away.
 constexpr uint32_t kStopTurnHoldMs = 800;     // hold CANCEL this long to stop the turn
 constexpr uint32_t kStopTurnHintMs = 300;     // ...and show that the hold will stop it
+// On the dashboard a press shorter than this walks the bot cursor; a longer one closes the list.
+constexpr uint32_t kDashboardCloseHoldMs = 700;
 constexpr uint32_t kPromptArmMs = 600;        // presses this soon after a question appears don't answer it
 constexpr uint32_t kPageLineMs = 1000;        // long text: reading time per line before the next page
 constexpr uint32_t kManualScrollPauseMs = 15000;  // UP/DOWN pauses automatic paging this long
@@ -1558,9 +1560,10 @@ void App::h_dashboard(const json::Value& m) {
                            : std::string(tr(i18n::Msg::AllIdle));
   dashboard_ready_ = true;
   // The cursor points at a row the host may have rebuilt away (its turn ended, the bot switched).
-  if (dash_cursor_ >= static_cast<int16_t>(dash_rows_.size())) dash_cursor_ = -1;
+  const std::vector<DashRow> drawn = merged_dash();
+  if (dash_cursor_ >= static_cast<int16_t>(drawn.size())) dash_cursor_ = -1;
   else if (dash_cursor_ >= 0) {
-    const DashRow& at = dash_rows_[static_cast<size_t>(dash_cursor_)];
+    const DashRow& at = drawn[static_cast<size_t>(dash_cursor_)];
     if (at.heading || at.profile.empty() || at.profile == agent_profile_) dash_cursor_ = -1;
   }
   // Widgets (layout 2): a snapshot too, so a message without them clears them.
@@ -2052,7 +2055,13 @@ void App::on_button(Button button, bool pressed, bool touch) {
       } else if (prompt_showing()) {
         if (prompt_armed(cancel_down_at_)) answer_prompt(false);
       } else if (mode_ == Mode::Listening) cancel_listening("cancelled");
-      else if (overlay_ != Overlay::None) dismiss_overlay();
+      else if (overlay_ == Overlay::Dashboard && !dash_targets().empty()) {
+        // On the list of bots the short press walks the cursor and the hold closes, so a board
+        // whose only spare key is this one still reaches every bot (mirrors the settings menu,
+        // which also moves on this key). Without another bot there is nothing to walk: close.
+        if (now() - cancel_down_at_ < kDashboardCloseHoldMs) dash_cursor_step(+1);
+        else dismiss_overlay();
+      } else if (overlay_ != Overlay::None) dismiss_overlay();
       else if (mode_ == Mode::Thinking || mode_ == Mode::Responding) {
         // Stopping the turn is the HOLD (fired from tick()); a short press shows the sessions,
         // as it does on the Ready screen, so looking at the board never discards the answer.
@@ -2506,13 +2515,30 @@ uint32_t App::page_dwell_ms() const {
   return std::max<uint32_t>(3000, static_cast<uint32_t>(rows) * kPageLineMs);
 }
 
-// The dashboard's switchable rows: sessions of ANOTHER bot (the host tags each row with the bot
-// that runs it; its own bot's rows are where the device already talks). Rows of hosts that don't
-// tag, and headings and tiles, are never targets — the buttons keep scrolling there.
+// The dashboard rows as drawn: what the host sent, plus one row per offered bot that the host
+// listed none of. A tagged row wins (it carries the live state); the extra row is how a device
+// reaches a bot with nothing running — and how it reaches any bot at all on a host whose plugin
+// predates the tagging.
+std::vector<DashRow> App::merged_dash() const {
+  std::vector<DashRow> out = dash_rows_;
+  if (agent_profiles_.size() < 2) return out;
+  for (const AgentProfile& p : agent_profiles_) {
+    if (p.id == agent_profile_) continue;  // the bot the device talks to already: nothing to switch to
+    bool listed = false;
+    for (const DashRow& r : out) listed = listed || r.profile == p.id;
+    if (listed) continue;
+    out.push_back({p.name, "", DashRow::Tone::Dim, false, p.id});
+  }
+  return out;
+}
+
+// The dashboard's switchable rows: bots other than the current one, in row order. Empty when the
+// host offers no other bot — then the buttons scroll as before.
 std::vector<int> App::dash_targets() const {
+  const std::vector<DashRow> rows = merged_dash();
   std::vector<int> out;
-  for (size_t i = 0; i < dash_rows_.size(); ++i) {
-    const DashRow& r = dash_rows_[i];
+  for (size_t i = 0; i < rows.size(); ++i) {
+    const DashRow& r = rows[i];
     if (!r.heading && !r.profile.empty() && r.profile != agent_profile_) out.push_back(static_cast<int>(i));
   }
   return out;
@@ -2521,6 +2547,7 @@ std::vector<int> App::dash_targets() const {
 void App::dash_cursor_step(int dir) {
   const std::vector<int> targets = dash_targets();
   if (targets.empty()) return;
+  const size_t total = merged_dash().size();
   size_t at;
   if (dash_cursor_ < 0) {
     at = dir > 0 ? 0 : targets.size() - 1;  // from nowhere: the first step enters at an end
@@ -2534,7 +2561,7 @@ void App::dash_cursor_step(int dir) {
   dash_cursor_ = static_cast<int16_t>(targets[at]);
   if (ui_) {  // the cursor row stays on screen: move the window when it walks out
     const int rows = ui_->dash_rows();
-    const int max_first = std::max(0, static_cast<int>(dash_rows_.size()) - rows);
+    const int max_first = std::max(0, static_cast<int>(total) - rows);
     if (dash_cursor_ < dash_scroll_) dash_scroll_ = std::max(0, static_cast<int>(dash_cursor_));
     if (dash_cursor_ >= dash_scroll_ + rows) dash_scroll_ = std::min(max_first, dash_cursor_ - rows + 1);
   }
@@ -2546,8 +2573,10 @@ void App::dash_cursor_step(int dir) {
 // request and its reply run there. The answer (the profile message) draws the greeting or shows
 // why it was refused.
 void App::dash_cursor_apply() {
-  if (dash_cursor_ < 0 || dash_cursor_ >= static_cast<int16_t>(dash_rows_.size())) return;
-  const std::string profile = dash_rows_[static_cast<size_t>(dash_cursor_)].profile;
+  if (dash_cursor_ < 0) return;
+  const std::vector<DashRow> rows = merged_dash();
+  if (dash_cursor_ >= static_cast<int16_t>(rows.size())) return;
+  const std::string profile = rows[static_cast<size_t>(dash_cursor_)].profile;
   dismiss_overlay();
   size_t i = 0;
   while (i < agent_profiles_.size() && agent_profiles_[i].id != profile) ++i;
@@ -3341,10 +3370,14 @@ void App::update_model() {
   } else if (overlay_ == Overlay::Dashboard) {
     m.screen = Screen::Dashboard;
     m.headline = dash_headline_;
-    m.dash = dash_rows_;
+    m.dash = merged_dash();
     m.scroll = dash_scroll_;
     m.dash_cursor = dash_cursor_;
-    m.hint = profile_.touch_screen ? std::string(tr(Msg::SwipeDownToClose)) : tr(Msg::ButtonToClose, {cancel});
+    // With another bot to reach, say so: the cursor walks on a short press and the hold closes.
+    const bool pick = !dash_targets().empty() && !profile_.touch_screen;
+    m.hint = profile_.touch_screen ? std::string(tr(Msg::SwipeDownToClose))
+             : pick ? tr(Msg::DashboardBotsHint, {control(profile_.cancel_label), control(profile_.cancel_label)})
+                    : tr(Msg::ButtonToClose, {cancel});
   } else if (overlay_ == Overlay::Card) {
     m.screen = Screen::Card;
     m.headline = card_title_.empty() ? "Hermes" : card_title_;

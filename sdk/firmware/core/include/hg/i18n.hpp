@@ -302,6 +302,7 @@ namespace hg::i18n {
   X(ProfileInSettings,      "Change in Settings") \
   X(ProfileListTitle,       "Talk to") \
   X(ProfileListHint,        "Swipe down to go back") \
+  X(DashboardBotsHint,      "{0} to pick a bot, hold {1} to close") \
   X(ProfileSwitching,       "Switching to {0}...") \
   X(ProfileSwitched,        "Now talking to {0}") \
   X(ProfileRefusedBusy,     "Finish this turn first") \

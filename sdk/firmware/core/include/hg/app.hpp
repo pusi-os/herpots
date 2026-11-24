@@ -913,8 +913,12 @@ class App {
   std::string dash_headline_;
   int dash_scroll_ = 0;
   int16_t dash_cursor_ = -1;  // the dashboard row the buttons point at; -1 = none (they scroll)
-  // The dashboard's switchable rows: sessions of ANOTHER bot, in row order. Empty when the host
-  // doesn't tag rows with bots or offers only this one — then the buttons scroll as before.
+  // The dashboard rows as drawn: what the host sent, plus a row for every offered bot that has
+  // none — so the buttons can always reach every bot, even a host that tags no rows (an older
+  // plugin). `dash_cursor_` indexes THIS list.
+  std::vector<DashRow> merged_dash() const;
+  // The dashboard's switchable rows: bots other than the current one, in row order. Empty when
+  // the host offers no other bot — then the buttons scroll as before.
   std::vector<int> dash_targets() const;
   void dash_cursor_step(int dir);
   void dash_cursor_apply();

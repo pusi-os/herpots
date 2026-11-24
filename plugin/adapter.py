@@ -937,7 +937,9 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
                 self._push_seq = seq = self._push_seq + 1
                 self._pushed_seq.update((s.device_id, seq) for s, sw in zip(targets, switching)
                                         if sw and self._hub is not None and self._hub.get(s.device_id) is s)
-                theirs = dashboard.BOARD.sessions(*await self._offered_boards())
+                roster = await asyncio.to_thread(self.profiles)
+                theirs = dashboard.with_bots(
+                    dashboard.BOARD.sessions(*await self._offered_boards()), roster)
         mine = dashboard.BOARD.sessions()  # after any roster wait, so a change made during it goes out
         if theirs is None:
             theirs = mine

@@ -169,6 +169,19 @@ class SessionBoard:
 BOARD = SessionBoard()  # this process's sessions; the plugin registers its hooks
 
 
+def with_bots(sessions: list[dict], roster: list[dict]) -> list[dict]:
+    """The session rows plus one row per offered bot that has no live session, so a device can
+    always reach every bot it may switch to — not only those with something running now."""
+    have = {str(s.get("profile") or "") for s in sessions}
+    out = list(sessions)
+    for p in roster[:MAX_SESSIONS]:
+        pid = str(p.get("id") or "")
+        if not pid or pid in have:
+            continue
+        out.append({"id": pid[-4:], "label": str(p.get("name") or pid), "state": "idle", "profile": pid})
+    return out
+
+
 def _os_lock(fh) -> None:
     """Take the operating system's exclusive lock on an open file, or raise OSError when another
     open file holds it. Closing the file, or its process ending, releases it."""

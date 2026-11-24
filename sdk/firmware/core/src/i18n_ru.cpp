@@ -279,6 +279,7 @@ const Entry kRussian[] = {
     {Msg::ProfileInSettings, "Смена в Настройках"},
     {Msg::ProfileListTitle, "Говорить с"},
     {Msg::ProfileListHint, "Свайп вниз — назад"},
+    {Msg::DashboardBotsHint, "{0} — выбор бота, удержать {1} — закрыть"},
     {Msg::ProfileSwitching, "Переключаюсь на {0}..."},
     {Msg::ProfileSwitched, "Теперь говорю с {0}"},
     {Msg::ProfileRefusedBusy, "Сначала заверши ход"},
