@@ -1121,6 +1121,7 @@ void Ui::draw_dashboard(Canvas& c, const UiModel& m, int y0, int y1) {
   for (int i = 0; i < rows && first + i < total; ++i, y += row_h) {
     const DashRow& row = m.dash[static_cast<size_t>(first + i)];
     const int ty = y + (row_h - glyph_h) / 2;
+    const bool cursor = first + i == m.dash_cursor;
     if (row.heading) {
       c.text(margin, ty, fit(row.label, cols_for(right - margin, s)), s, kDim);
       c.fill_rect(margin, y + row_h - 1, right - margin, 1, kFaint);
@@ -1134,6 +1135,7 @@ void Ui::draw_dashboard(Canvas& c, const UiModel& m, int y0, int y1) {
     const int value_cols = static_cast<int>(font::length(value));
     c.text(lx, ty, fit(row.label, cols - value_cols - (value_cols ? 1 : 0)), s, kText);
     if (value_cols) c.text(right - Canvas::text_width(value, s), ty, value, s, tone_color(row.tone));
+    if (cursor) c.fill_rect(margin, y + row_h - 2, right - margin, 2, kDim);  // TALK switches here
   }
   if (scrolls) {
     const int track_y = y0 + margin, track_h = std::min(rows * row_h, y1 - track_y);

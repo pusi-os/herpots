@@ -60,6 +60,9 @@ struct DashRow {
   std::string label, value;
   Tone tone = Tone::Dim;
   bool heading = false;
+  // The bot (Hermes profile) whose session this row shows; empty on headings, tiles and hosts
+  // that do not say. A row of ANOTHER bot is selectable on the dashboard: TALK switches there.
+  std::string profile;
 };
 
 // A home-screen widget: data the host set, drawn over the whole panel.
@@ -150,8 +153,10 @@ struct UiModel {
   std::vector<SettingRow> settings;
   int settings_sel = 0;
   int settings_scroll = 0;
-  // Dashboard screen: its rows, drawn from `scroll` (0 = the top).
+  // Dashboard screen: its rows, drawn from `scroll` (0 = the top). `dash_cursor` is the row the
+  // buttons point at (-1: no cursor — the buttons scroll instead), drawn underlined.
   std::vector<DashRow> dash;
+  int dash_cursor = -1;
   // Card screen, a structured card (docs/protocol.md#display): `items` are list rows after the body's
   // lines, `card_progress` a bar above them (0..100; -1: none) and `card_qr` a code that takes the
   // content band (borrowed like `qr`). Choice screen: `items` are the answers, `item_sel` the

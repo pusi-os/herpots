@@ -1533,7 +1533,7 @@ void App::h_dashboard(const json::Value& m) {
   std::vector<DashRow> rows;
   int busy = 0, waiting = 0;
   const json::Value& sessions = m["sessions"];
-  rows.push_back({tr(i18n::Msg::HermesSessions), "", DashRow::Tone::Dim, true});
+  rows.push_back({tr(i18n::Msg::HermesSessions), "", DashRow::Tone::Dim, true, {}});
   for (size_t i = 0; i < sessions.size() && i < kDashMaxEach; ++i) {
     const json::Value& s = sessions[i];
     const std::string state(s["state"].str_or("idle"));
@@ -1543,20 +1543,26 @@ void App::h_dashboard(const json::Value& m) {
                               : state == "busy"  ? tr(i18n::Msg::DashBusy)
                               : state == "idle"  ? tr(i18n::Msg::DashIdle)
                                                  : state;
-    rows.push_back({s["label"].as_string(), shown, tone(state), false});
+    rows.push_back({s["label"].as_string(), shown, tone(state), false, std::string(s["profile"].str_or(""))});
   }
-  if (rows.size() == 1) rows.push_back({tr(i18n::Msg::NoSessions), "", DashRow::Tone::Dim, false});
+  if (rows.size() == 1) rows.push_back({tr(i18n::Msg::NoSessions), "", DashRow::Tone::Dim, false, {}});
   const json::Value& tiles = m["tiles"];
-  if (tiles.size()) rows.push_back({tr(i18n::Msg::DashStatus), "", DashRow::Tone::Dim, true});
+  if (tiles.size()) rows.push_back({tr(i18n::Msg::DashStatus), "", DashRow::Tone::Dim, true, {}});
   for (size_t i = 0; i < tiles.size() && i < kDashMaxEach; ++i) {
     const json::Value& t = tiles[i];
-    rows.push_back({t["label"].as_string(), t["value"].as_string(), tone(t["state"].str_or("")), false});
+    rows.push_back({t["label"].as_string(), t["value"].as_string(), tone(t["state"].str_or("")), false, {}});
   }
   dash_rows_ = std::move(rows);
   dash_headline_ = waiting ? tr(i18n::Msg::NWaiting, {std::to_string(waiting)})
                    : busy  ? tr(i18n::Msg::NBusy, {std::to_string(busy)})
                            : std::string(tr(i18n::Msg::AllIdle));
   dashboard_ready_ = true;
+  // The cursor points at a row the host may have rebuilt away (its turn ended, the bot switched).
+  if (dash_cursor_ >= static_cast<int16_t>(dash_rows_.size())) dash_cursor_ = -1;
+  else if (dash_cursor_ >= 0) {
+    const DashRow& at = dash_rows_[static_cast<size_t>(dash_cursor_)];
+    if (at.heading || at.profile.empty() || at.profile == agent_profile_) dash_cursor_ = -1;
+  }
   // Widgets (layout 2): a snapshot too, so a message without them clears them.
   std::vector<Widget> widgets;
   const json::Value& list = m["widgets"];
@@ -1994,6 +2000,7 @@ void App::on_button(Button button, bool pressed, bool touch) {
       if (pressed) {
         if (cancel_held_) return;  // wait for the local settings chord
         if (overlay_ == Overlay::Profiles) return;  // the grid's TALK selects on release
+        if (overlay_ == Overlay::Dashboard && dash_cursor_ >= 0) return;  // ...and the dashboard's too
         // Before the connection check: a recording held through a lost connection still ends.
         if (mode_ == Mode::Listening) {
           if (hands_free_) finish_listening();
@@ -2012,6 +2019,8 @@ void App::on_button(Button button, bool pressed, bool touch) {
         start_listening(talk_mode_ == TalkMode::Tap);
       } else if (overlay_ == Overlay::Profiles) {
         profile_cursor_select();  // the grid's TALK picks the cursor's profile
+      } else if (overlay_ == Overlay::Dashboard && dash_cursor_ >= 0) {
+        dash_cursor_apply();  // the dashboard's TALK switches to the cursor's bot
       } else if (mode_ == Mode::Listening && !hands_free_) {
         if (now() - mode_since_ < kMinUtteranceMs) {
           cancel_listening("too short");
@@ -2068,6 +2077,11 @@ void App::on_button(Button button, bool pressed, bool touch) {
       if (overlay_ == Overlay::Profiles) {
         // The grid walks by button: UP/DOWN move the cursor across profiles and the Settings cell.
         if (pressed) profile_cursor_move(button == Button::Up ? -1 : +1);
+        return;
+      }
+      if (overlay_ == Overlay::Dashboard && !dash_targets().empty()) {
+        // The dashboard's session rows of other bots: the buttons walk the cursor, TALK switches.
+        if (pressed) dash_cursor_step(button == Button::Up ? -1 : +1);
         return;
       }
       if (!pressed) {
@@ -2492,11 +2506,62 @@ uint32_t App::page_dwell_ms() const {
   return std::max<uint32_t>(3000, static_cast<uint32_t>(rows) * kPageLineMs);
 }
 
+// The dashboard's switchable rows: sessions of ANOTHER bot (the host tags each row with the bot
+// that runs it; its own bot's rows are where the device already talks). Rows of hosts that don't
+// tag, and headings and tiles, are never targets — the buttons keep scrolling there.
+std::vector<int> App::dash_targets() const {
+  std::vector<int> out;
+  for (size_t i = 0; i < dash_rows_.size(); ++i) {
+    const DashRow& r = dash_rows_[i];
+    if (!r.heading && !r.profile.empty() && r.profile != agent_profile_) out.push_back(static_cast<int>(i));
+  }
+  return out;
+}
+
+void App::dash_cursor_step(int dir) {
+  const std::vector<int> targets = dash_targets();
+  if (targets.empty()) return;
+  size_t at;
+  if (dash_cursor_ < 0) {
+    at = dir > 0 ? 0 : targets.size() - 1;  // from nowhere: the first step enters at an end
+  } else {
+    const auto cur = std::find(targets.begin(), targets.end(), dash_cursor_);
+    size_t pos = cur != targets.end() ? static_cast<size_t>(cur - targets.begin())
+                                      : (dir > 0 ? 0 : targets.size() - 1);
+    pos = (pos + (dir > 0 ? 1 : targets.size() - 1)) % targets.size();
+    at = pos;
+  }
+  dash_cursor_ = static_cast<int16_t>(targets[at]);
+  if (ui_) {  // the cursor row stays on screen: move the window when it walks out
+    const int rows = ui_->dash_rows();
+    const int max_first = std::max(0, static_cast<int>(dash_rows_.size()) - rows);
+    if (dash_cursor_ < dash_scroll_) dash_scroll_ = std::max(0, static_cast<int>(dash_cursor_));
+    if (dash_cursor_ >= dash_scroll_ + rows) dash_scroll_ = std::min(max_first, dash_cursor_ - rows + 1);
+  }
+  page_at_ = now() + page_dwell_ms();
+  update_model();
+}
+
+// TALK on the dashboard applies the cursor's row: the device switches to that bot, and the next
+// request and its reply run there. The answer (the profile message) draws the greeting or shows
+// why it was refused.
+void App::dash_cursor_apply() {
+  if (dash_cursor_ < 0 || dash_cursor_ >= static_cast<int16_t>(dash_rows_.size())) return;
+  const std::string profile = dash_rows_[static_cast<size_t>(dash_cursor_)].profile;
+  dismiss_overlay();
+  size_t i = 0;
+  while (i < agent_profiles_.size() && agent_profiles_[i].id != profile) ++i;
+  if (i >= agent_profiles_.size() || !select_agent_profile(i))
+    set_hint_flash(tr(i18n::Msg::ProfileRefusedUnknown));
+}
+
 bool App::turn_page() {
   // Only text screens that are read from the top page; a streaming reply stays pinned to its end.
   if (!ui_ || model_.hero) return false;
   if (model_.screen == Screen::Dashboard) {
-    // A dashboard longer than the screen cycles through its pages, back to the top.
+    // A dashboard longer than the screen cycles through its pages, back to the top — unless the
+    // cursor walks it: paging under the user's hand would move the rows they point at.
+    if (dash_cursor_ >= 0) return false;
     const int rows = ui_->dash_rows(), total = static_cast<int>(dash_rows_.size());
     if (total <= rows) return false;
     dash_scroll_ = dash_scroll_ >= total - rows ? 0 : std::min(total - rows, dash_scroll_ + std::max(1, rows - 1));
@@ -2540,6 +2605,7 @@ void App::dismiss_overlay() {
   if (overlay_ == Overlay::None) return;
   overlay_ = Overlay::None;
   image_stream_ = -1;
+  dash_cursor_ = -1;  // a fresh visit starts without the cursor
   if (ui_) ui_->invalidate();
 }
 
@@ -3233,7 +3299,7 @@ void App::update_model() {
       const AgentProfile& p = agent_profiles_[i];
       const bool current = p.id == agent_profile_;
       const bool cursor = static_cast<int>(i) == profile_cursor_;
-      m.dash.push_back({p.name, p.id, cursor ? DashRow::Tone::Busy : current ? DashRow::Tone::Waiting : DashRow::Tone::Dim});
+      m.dash.push_back({p.name, p.id, cursor ? DashRow::Tone::Busy : current ? DashRow::Tone::Waiting : DashRow::Tone::Dim, false, {}});
       // The icon: the face the device holds for the current profile, the mascot for the default
       // one (which wears it when it has no face of its own); an initial for the rest.
       if (current && face_) m.face_row = static_cast<int16_t>(i);
@@ -3242,7 +3308,7 @@ void App::update_model() {
     // The last cell opens Settings: it pages like a profile, and is never the current one.
     m.settings_row = static_cast<int16_t>(m.dash.size());
     const bool settings_cursor = static_cast<int>(agent_profiles_.size()) == profile_cursor_;
-    m.dash.push_back({tr(Msg::Settings), std::string(), settings_cursor ? DashRow::Tone::Busy : DashRow::Tone::Dim});
+    m.dash.push_back({tr(Msg::Settings), std::string(), settings_cursor ? DashRow::Tone::Busy : DashRow::Tone::Dim, false, {}});
     m.hint = tr(Msg::ProfileListHint);
     if (thumb_px_) {  // the profiles' own faces, where Hermes sent them
       m.thumb_px = static_cast<uint16_t>(thumb_px_);
@@ -3277,6 +3343,7 @@ void App::update_model() {
     m.headline = dash_headline_;
     m.dash = dash_rows_;
     m.scroll = dash_scroll_;
+    m.dash_cursor = dash_cursor_;
     m.hint = profile_.touch_screen ? std::string(tr(Msg::SwipeDownToClose)) : tr(Msg::ButtonToClose, {cancel});
   } else if (overlay_ == Overlay::Card) {
     m.screen = Screen::Card;

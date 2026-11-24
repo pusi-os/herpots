@@ -912,6 +912,12 @@ class App {
   std::vector<DashRow> dash_rows_;
   std::string dash_headline_;
   int dash_scroll_ = 0;
+  int16_t dash_cursor_ = -1;  // the dashboard row the buttons point at; -1 = none (they scroll)
+  // The dashboard's switchable rows: sessions of ANOTHER bot, in row order. Empty when the host
+  // doesn't tag rows with bots or offers only this one — then the buttons scroll as before.
+  std::vector<int> dash_targets() const;
+  void dash_cursor_step(int dir);
+  void dash_cursor_apply();
   bool can_open_dashboard() const { return profile_.has_cancel_button || profile_.touch_screen; }
   // the dashboard's widgets (layout 2), paged with the scroll buttons or sideways swipes; a board
   // with neither asks for layout 1, where the host lists them as tiles

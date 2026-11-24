@@ -55,6 +55,7 @@ class SessionBoard:
         self._lock = threading.Lock()
         self._sessions: dict[str, dict[str, Any]] = {}
         self._listeners: list[Callable[[], None]] = []
+        self.profile_name = "default"  # the bot this board belongs to, set in register()
 
     def subscribe(self, listener: Callable[[], None]) -> Callable[[], None]:
         """Call ``listener`` (on the hook's thread) after each change. Returns the unsubscribe."""
@@ -138,7 +139,8 @@ class SessionBoard:
             ctx.register_hook(name, getattr(self, name))
         # Hermes loads a copy of the plugin per profile, and a turn fires only its own profile's
         # hooks. A device switched to this profile reads this board too (adapter._push_dashboard).
-        runtime.add_board(getattr(ctx, "profile_name", None) or "default", self)
+        self.profile_name = getattr(ctx, "profile_name", None) or "default"
+        runtime.add_board(self.profile_name, self)
 
     # -- reading ------------------------------------------------------------------------
 
@@ -152,11 +154,16 @@ class SessionBoard:
 
     def sessions(self, *others: SessionBoard) -> list[dict[str, str]]:
         """Sessions worth showing, with those of ``others``: waiting first, then busy, then idle;
-        newest first within each."""
-        rows = sorted((row for board in (self, *others) for row in board._live()),
-                      key=lambda kv: (_ORDER[kv[1]["state"]], -kv[1].get("at", 0)))
-        return [{"id": sid[-4:], "label": f"{rec['platform'] or 'session'} {sid[-4:]}", "state": rec["state"]}
-                for sid, rec in rows[:MAX_SESSIONS]]
+        newest first within each. Each row names the bot (profile) that runs it, so a device's
+        dashboard can offer another bot's session as a switch (the device sends profile.select)."""
+        items = []
+        for board in (self, *others):
+            name = getattr(board, "profile_name", "") or ""
+            for sid, rec in board._live():
+                items.append((name, sid, rec))
+        items.sort(key=lambda it: (_ORDER[it[2]["state"]], -it[2].get("at", 0)))
+        return [{"id": it[1][-4:], "label": f"{it[2]['platform'] or 'session'} {it[1][-4:]}",
+                 "state": it[2]["state"], "profile": it[0]} for it in items[:MAX_SESSIONS]]
 
 
 BOARD = SessionBoard()  # this process's sessions; the plugin registers its hooks
