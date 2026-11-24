@@ -1375,10 +1375,6 @@ void wearForBench(int8_t idx) { s_benchOutfit = (idx >= 0 && idx < (int8_t)OUTFI
 
 bool jailed();
 static OutfitId currentOutfit() {
-    // hercharm-gadget port: outfits are stubbed for flash (drawOutfit is the
-    // no-op path); nobody ever wears a costume here.
-    return OutfitId::NONE;
-    if (s_outfitOverride >= 0 && s_outfitOverride < (int8_t)OUTFITS_N)
         return (OutfitId)s_outfitOverride;
     if (jailed()) return OutfitId::STRIPES;
     if (s_benchOutfit >= 0) return (OutfitId)s_benchOutfit;
@@ -4860,51 +4856,8 @@ static uint32_t scouterReading(uint32_t e) {
 }
 
 static void drawScouter(TFT_eSPI& t, int cx2, int hh, uint32_t now, float scale) {
-    if (!scouterOn(now)) return;
-    auto S = [scale](int v) { return (int)(v * scale); };
-    const uint32_t e = now - s_scoutStart;
-    const int lx = cx2 + S(2), ly = hh + S(5), lw = S(11), lh = S(9);
-    if (e < SCOUT_READ_MS + 150u) {
-        // The earpiece, the arm round to the lens, and the lens itself: a
-        // green pane with a lighter frame and a target mark that hunts.
-        t.fillRect(cx2 + S(14), hh + S(9), S(4), S(7), TFT_BLACK);
-        t.fillRect(cx2 + S(14) + 1, hh + S(9) + 1, S(4) - 2, S(7) - 2, yz565(146, 146, 170));
-        t.fillRect(lx + lw - 1, hh + S(6), cx2 + S(15) - (lx + lw) + 1, S(2), TFT_BLACK);
-        t.fillRect(lx - 1, ly - 1, lw + 2, lh + 2, TFT_BLACK);
-        t.fillRect(lx, ly, lw, lh, O9_SCOUTDK);
-        t.drawRect(lx + 1, ly + 1, lw - 2, lh - 2, O9_SCOUTER);
-        const int mx = lx + S(3) + (int)((sinf((float)e / 120.0f) + 1.0f) * (float)S(2));
-        const int my = ly + S(3) + (int)((cosf((float)e / 170.0f) + 1.0f) * (float)S(1));
-        t.drawFastHLine(mx - S(1), my, S(2) + 1, O9_SCOUTER);
-        t.drawFastVLine(mx, my - S(1), S(2) + 1, O9_SCOUTER);
-        // The reading, beside his head.
-        char buf[8];
-        const uint32_t r = scouterReading(e);
-        snprintf(buf, sizeof(buf), r >= 9001 ? "9001+" : "%lu", (unsigned long)r);
-        const int tx = cx2 + S(19), ty = hh - S(2);
-        const int tw = (int)strlen(buf) * 6 + 4;
-        t.fillRect(tx - 1, ty - 1, tw + 2, 12, TFT_BLACK);
-        t.drawRect(tx - 1, ty - 1, tw + 2, 12, O9_SCOUTER);
-        t.setTextSize(1);
-        t.setTextColor((r >= 9001 && ((now / 80u) & 1u)) ? TFT_WHITE : O9_SCOUTER, TFT_BLACK);
-        t.setCursor(tx + 2, ty + 1);
-        t.print(buf);
-    }
-    if (e >= SCOUT_READ_MS) {
-        // It goes off: a burst of green and white, and shards flying.
-        const uint32_t b = e - SCOUT_READ_MS;
-        const int cx = lx + lw / 2, cy = ly + lh / 2;
-        const int r = S(3) + (int)(b * (uint32_t)S(16) / (SCOUT_MS - SCOUT_READ_MS));
-        if (b < 260u) {
-            t.fillCircle(cx, cy, r, TFT_WHITE);
-            t.fillCircle(cx, cy, r * 2 / 3, O9_SCOUTER);
-        }
-        for (uint8_t i = 0; i < 8; i++) {
-            const float a = (float)i * 0.785398f + 0.3f;
-            const int px = cx + (int)(cosf(a) * (float)r), py = cy + (int)(sinf(a) * (float)r);
-            t.fillRect(px - 1, py - 1, 3, 3, (i & 1) ? O9_SCOUTER : TFT_WHITE);
-        }
-    }
+    // hercharm-gadget port: the scouter gag is triggered from Event::PETTED,
+    // which no call site in this port can raise; the render is stubbed for flash.
 }
 
 // The reading passes nine thousand: the line, and the first time, the outfit.
@@ -4928,12 +4881,524 @@ static void scouterTick(uint32_t now) {
 #include "th3_0n3.inc"
 
 static void drawOutfit(TFT_eSPI& t, int cx2, int hy, uint32_t now, Mood m, float scale, OutfitId outfit) {
-    // hercharm-gadget port: the costume wardrobe is stubbed for flash size
-    // (docs/potsy-port-spec.md §Ограничения) — the bare body, moods, glasses
-    // and the speech bubble are what this build draws. Every outfit drops to
-    // NONE here, which is exactly drawOutfit's own no-op path.
-    (void)t; (void)cx2; (void)hy; (void)now; (void)m; (void)scale;
-    if (true || outfit == OutfitId::NONE) return;
+    if (outfit == OutfitId::NONE) return;
+    auto S = [scale](int v) { return (int)(v * scale); };
+    (void)m;
+    using namespace Theme;
+
+    switch (outfit) {
+        case OutfitId::STRIPES: {
+            // hercharm-gadget port: the jail sentence is stubbed (jailed() is always
+            // false here), so the cap can never be worn; the case stays for the label.
+        }
+        case OutfitId::TANOOKI: {
+            // A tanooki SUIT, the one-piece in the reference, not a raccoon
+            // mask: his fur is recoloured to the suit's orange-brown up in
+            // drawBody(), so the head reads as the hood with his face in its
+            // opening. The two pointed ears on top go on in drawBody(), behind
+            // the head, so it covers their roots: on top, their outline drew
+            // a black line across his crown.
+            // (Two passes at a mask came first. A bar across the brow read as
+            // a visor; round ears with dark centres read as a second pair of
+            // eyes.)
+            // ---- the tail -------------------------------------------------
+            // Drawn behind him, in drawBody(), not here -- see the tail block
+            // up there. This case only draws the mask; the tail needs to be
+            // under his body or it lies across his leg instead of coming out
+            // from behind his hip.
+            break;
+        }
+        case OutfitId::PARKA: {
+            const uint16_t ink   = (uint16_t)0x1040;
+            const uint16_t org   = (uint16_t)0xFC43;
+            const uint16_t seam  = (uint16_t)0x8A21;
+            const uint16_t fur   = (uint16_t)0x6A05;
+
+            const int oy = hy + S(8);
+            const int ow = (S(17) * 102) / 100, oh = (S(16) * 102) / 100;
+            const int R  = S(23);
+
+            // ---- the hood, repainted as a solid ring OVER his head --------
+            // A sprite has no clipping, so a hood that is genuinely in front
+            // of him cannot be had by drawing order alone: his head is drawn
+            // at full size underneath, and his ears and the corners of his
+            // jaw both reach past the opening. This walks the shell row by
+            // row and refills everything outside the opening, which paints
+            // those out and leaves nothing of his face outside the ring.
+            //
+            // The black ring is FILLED by this same loop rather than stroked
+            // with drawEllipse afterwards. Stroking it was what put orange
+            // flecks in the brown around his face: the fill stepped its edge
+            // by truncating a square root once per row, drawEllipse stepped
+            // its own by Bresenham, and wherever the curve runs flat the two
+            // disagreed by a pixel and left hood orange showing through the
+            // gap between them. One number per row makes that impossible.
+            const int rw = ow - 2, rh = oh - 2;    // the ring's inner edge
+            for (int dy2 = -(R + 1); dy2 <= R + 1; dy2++) {
+                const int yy = oy + dy2;
+                const int a2 = (R + 1) * (R + 1) - dy2 * dy2;
+                if (a2 < 0) continue;
+                const int xo = (int)sqrtf((float)a2);
+                const int b2 = R * R - dy2 * dy2;
+                const int xr = (b2 > 0) ? (int)sqrtf((float)b2) : -1;
+                // Half-widths of the ring's inner and outer edges on this
+                // row. Both fall to zero once the row clears the opening,
+                // which is what fills the rows above and below it solid.
+                int xj = 0, xk = 0;
+                if (dy2 > -rh && dy2 < rh) {
+                    const float k = 1.0f - ((float)dy2 * (float)dy2) / ((float)rh * (float)rh);
+                    xj = (int)((float)rw * sqrtf(k));
+                }
+                if (dy2 > -oh && dy2 < oh) {
+                    const float k = 1.0f - ((float)dy2 * (float)dy2) / ((float)oh * (float)oh);
+                    xk = (int)((float)ow * sqrtf(k));
+                }
+                // Black from the ring's inner edge all the way out, then the
+                // hood's orange back over everything beyond its outer edge.
+                // What survives in between is the ring itself.
+                if (xo > xj) {
+                    t.drawFastHLine(cx2 - xo, yy, xo - xj + 1, ink);
+                    t.drawFastHLine(cx2 + xj, yy, xo - xj + 1, ink);
+                }
+                if (xr > xk) {
+                    t.drawFastHLine(cx2 - xr, yy, xr - xk + 1, org);
+                    t.drawFastHLine(cx2 + xk, yy, xr - xk + 1, org);
+                }
+            }
+            t.drawCircle(cx2, oy, R + 1, ink);
+
+            // No stitching. Everything outside the black ring is the flat
+            // orange of the hood, the way the reference has it -- a second
+            // ellipse out here only ever read as a line drawn across the hood
+            // rather than as a seam in it, whatever size it was set to.
+            // The hood's own outer edge, below, and the drawstring, at the
+            // bottom, are the only marks that belong out here.
+
+            // ---- arms and mittens, after the hood -------------------------
+            // The hood shell is painted after the arms in drawBody() -- it has
+            // to be, or every sleeve outline cuts across it -- so an arm that
+            // reaches up into the hood is buried, leaving the mitten floating
+            // beside his head. WAVE swings an arm straight through that disc.
+            // Any hand ending inside the hood therefore gets its whole arm
+            // redrawn here, on top. Arms hanging clear of it are left as
+            // drawBody() drew them, which is what keeps his resting shoulders
+            // from showing through the hood.
+            const int mr = S(5);
+            const int hdr = R + mr;
+            for (int8_t sg = -1; sg <= 1; sg += 2) {
+                const int ax = (sg < 0) ? s_armL1x : s_armR1x;
+                const int ay = (sg < 0) ? s_armL1y : s_armR1y;
+                const int sx = (sg < 0) ? s_armL0x : s_armR0x;
+                const int sy = (sg < 0) ? s_armL0y : s_armR0y;
+                // Does the arm, shoulder to hand, pass through the hood? The
+                // closest point on the segment to the hood's centre, and its
+                // distance. Testing only the hand missed a wave, where the
+                // hand clears the hood but the forearm crosses it, and the
+                // mitten hung in the air with no sleeve behind it.
+                const float vx = (float)(ax - sx), vy = (float)(ay - sy);
+                const float wx = (float)(cx2 - sx), wy = (float)(oy - sy);
+                const float vv = vx * vx + vy * vy;
+                float u = vv > 0.0f ? (vx * wx + vy * wy) / vv : 0.0f;
+                if (u < 0.0f) u = 0.0f; else if (u > 1.0f) u = 1.0f;
+                const float qx = (float)sx + u * vx - (float)cx2;
+                const float qy = (float)sy + u * vy - (float)oy;
+                if (qx * qx + qy * qy < (float)(hdr * hdr)) {
+                    wideLine(t, sx, sy, ax, ay, S(7) + 2, seam);
+                    wideLine(t, sx, sy, ax, ay, S(7), org);
+                }
+                // Mittens, thumbs inboard. The thumb is filled and then
+                // outlined so its own edge crosses the palm and reads as a
+                // second shape.
+                t.fillCircle(ax, ay, mr + 1, ink);
+                t.fillCircle(ax, ay, mr, fur);
+                const int tr = (mr * 52) / 100;
+                const int tx = ax - sg * ((mr * 62) / 100);
+                t.fillCircle(tx, ay - S(2), tr, fur);
+                t.drawCircle(tx, ay - S(2), tr, ink);
+            }
+
+            // The drawstring is only the V, off the chin of the opening.
+            const int d  = (int)(sinf((float)(now % 9000) / 9000.0f * 6.2831853f) * (float)S(1));
+            const int vy = oy + oh - S(1);
+            wideLine(t, cx2 + d, vy, cx2 - S(5) + d, vy + S(8), 2, seam);
+            wideLine(t, cx2 + d, vy, cx2 + S(5) + d, vy + S(8), 2, seam);
+            break;
+        }
+        case OutfitId::VOIDEYE: {
+            // 16, not the 14 this shipped with. That number was chosen while
+            // the title bar still owned the top sixteen rows of the screen, so
+            // it was sized to read big WITHOUT asking for headroom -- his head
+            // box is only 30x24 and anything taller went behind the bar.
+            //
+            // Measured off rendered frames now that the bar is gone: every
+            // other costume's silhouette tops out around row 8 (that is his
+            // own crest, not the costume), and this one stopped at row 28.
+            // Twenty rows of empty sky that nothing else was using.
+            //
+            // 16 and not more: at 17 the sphere starts to outgrow its own
+            // socket, and the violet ring that reads as an eye SET IN
+            // something becomes a crescent hanging under a loose ball.
+            //
+            // Only the radius moves. ey stays at S(11) so the sphere grows
+            // around its centre instead of climbing out of the socket, and
+            // every socket ellipse below is expressed in er, so they grow
+            // with it and the proportions hold.
+            const int er = S(16);
+            const int ey = hy + S(11);
+            // SOCKET, drawn BEHIND the sphere so it shows only as a violet ring
+            // at the sides and under the chin. Over the top it would cover the
+            // sky, which is the part of this costume worth having.
+            // A faint glow ring round the socket, breathing slowly.
+            const bool glow = ((now / 1400) % 3u) != 0;
+            t.fillEllipse(cx2, ey + S(5), er + S(7), (er * 92) / 100 + S(1),
+                          glow ? (uint16_t)0x4935 : (uint16_t)0x212A);
+            t.fillEllipse(cx2, ey + S(5), er + S(6), (er * 92) / 100, (uint16_t)0x41F0);
+            t.fillEllipse(cx2, ey + S(6), er + S(3), (er * 82) / 100, (uint16_t)0x1066);
+            // The sphere. That outer circle is a RIM, not the black underlay
+            // every flying junk object gets: this is worn against a black sky
+            // full of stars, and a black outline against that is nothing at all.
+            t.fillCircle(cx2, ey, er + 1, (uint16_t)0x8337);
+            t.fillCircle(cx2, ey, er,     (uint16_t)0x28EB);
+            // The sky inside him, running the same warp the Starfield does --
+            // which is where he took the eye from. See void_eye.h for why none
+            // of this computes a sine.
+            const uint8_t phase = (uint8_t)((now / 44) & 63u);
+            for (uint8_t i = 0; i < VOID_STAR_N; i++) {
+                const uint8_t sk = (uint8_t)((phase + VOID_STAR_PH[i]) & 63u);
+                const int rad = VOID_RSTEP[sk];
+                const int sx = cx2 + (VOID_STAR_DX[i] * rad * er) / 4096;
+                const int sy = ey  + (VOID_STAR_DY[i] * rad * er) / 4096;
+                int b = 90 + sk * 2; if (b > 255) b = 255;
+                const uint16_t sc = t.color565(b, b, 255);
+                if (sk > 52) t.fillRect(sx, sy, 2, 2, sc);
+                else         t.drawPixel(sx, sy, sc);
+            }
+            // The iris rides the gaze. The specular highlight deliberately does
+            // not: it is a reflection off the sphere, and the sphere is not the
+            // thing that moved.
+            int gx = 0, gy = 0;
+            voidGaze(now, er, gx, gy);
+            const int ix = cx2 + (er * 16) / 100 + gx, iy = ey + gy;
+            t.fillCircle(ix, iy, (er * 58) / 100, (uint16_t)0x384C);
+            t.fillCircle(ix, iy, (er * 50) / 100, (uint16_t)0x91FB);
+            const uint16_t spokeCol = (uint16_t)0x6135;
+            for (uint8_t sp = 0; sp < VOID_SPOKE_N; sp++) {
+                t.drawLine(ix + (VOID_SPOKE[sp][0] * er) / 64,
+                           iy + (VOID_SPOKE[sp][1] * er) / 64,
+                           ix + (VOID_SPOKE[sp][2] * er) / 64,
+                           iy + (VOID_SPOKE[sp][3] * er) / 64, spokeCol);
+            }
+            t.fillCircle(ix, iy, (er * 24) / 100, BLACK);
+            t.fillCircle(cx2 - (er * 8) / 100, ey - (er * 36) / 100,
+                         (er * 17) / 100, (uint16_t)0x947A);
+            voidLid(t, cx2, ey, er, voidBlink(now), (uint16_t)0x41F0, BLACK);
+            break;
+        }
+        case OutfitId::WOLFPELT: break;  // hercharm-gadget port: the pelt render is stubbed for flash size; its
+                                   // FIRE-background unlock does not exist in this port.
+        case OutfitId::SHARK: break;  // hercharm-gadget port: the shark render is stubbed for flash size; its
+                               // aquarium unlock does not exist in this port.
+        case OutfitId::UNICORN: {
+            // Base sits right at hy -- the top edge of the head shape
+            // itself (see drawBody's head fillRoundRect a few lines
+            // below this switch) -- not up at the crest peak (hy -
+            // S(14)), which put the whole horn floating well above his
+            // actual face. Pastel fur is handled separately, up in
+            // drawBody()'s furMain/furLight block.
+            int baseY = hy;
+            int tipY  = baseY - S(24);
+            int baseW = S(9);
+            t.fillTriangle(cx2 - baseW / 2, baseY, cx2 + baseW / 2, baseY, cx2, tipY, WHITE);
+            // Candy-cane twist: diagonal rainbow stripes crossing the
+            // cone (rather than flat horizontal bands) so it reads as
+            // a spiral, narrowing to match the cone's taper as they
+            // climb toward the tip.
+            static const uint16_t bands[6] = { RED, AMBER, VAPOR_YELLOW, GREEN, VAPOR_BLUE, VAPOR_PURPLE };
+            for (int i = 0; i < 6; i++) {
+                float frac = (float)i / 6.0f;
+                int y0 = baseY + (int)((tipY - baseY) * frac);
+                int w0 = (int)(baseW * (1.0f - frac));
+                wideLine(t, cx2 - w0 / 2 - S(1), y0, cx2 + w0 / 2 + S(1), y0 - S(3), S(2), bands[i]);
+            }
+            break;
+        }
+        case OutfitId::TINFOIL: {
+            // Crumpled by hand, not stamped: the cone is four facets in
+            // alternating tones round an apex pushed off centre, on a rolled
+            // brim, with a beanie propeller on a stalk turning lazily on
+            // top. Greys from the same RGB332 ramp SHARK SUIT uses -- the only
+            // cool neutrals the frame buffer has.
+            const uint16_t ink = BLACK;
+            const uint16_t fDk = (uint16_t)0x4A4A;
+            const uint16_t fMd = (uint16_t)0x9495;
+            const uint16_t fLt = (uint16_t)0xDEDF;
+            const int ax = cx2 + S(2), ay = hy - S(12);
+            const int by = hy + S(1);
+            const int bx[5] = { cx2 - S(14), cx2 - S(6), cx2 + S(1), cx2 + S(8), cx2 + S(14) };
+            const int tx = ax + S(1), ty = ay - S(4);          // propeller hub
+            inked(ink, fMd, [&](int ox, int oy, uint16_t c) {
+                t.fillTriangle(bx[0] + ox, by + oy, bx[4] + ox, by + oy, ax + ox, ay + oy, c);
+                t.fillRoundRect(cx2 - S(16) + ox, hy - S(1) + oy, S(32), S(5), S(2), c);
+                t.drawLine(ax + ox, ay + oy, tx + ox, ty + oy, c);
+            });
+            // Facets: lit from the upper left, with one crumple in the middle
+            // catching the light the wrong way, which is what reads as foil.
+            const uint16_t fc[4] = { fLt, fMd, fLt, fDk };
+            for (uint8_t i = 0; i < 4; i++)
+                t.fillTriangle(bx[i], by, bx[i + 1], by, ax, ay, fc[i]);
+            t.drawLine(cx2 - S(9), hy - S(2), cx2 - S(4), hy - S(5), fDk);
+            t.drawLine(cx2 + S(4), hy - S(1), cx2 + S(6), hy - S(6), fMd);
+            t.drawLine(bx[0] + S(3), by - S(2), ax - S(1), ay + S(2), WHITE);
+            // The rolled brim: lit along the top, shaded underneath, crinkled.
+            t.fillRoundRect(cx2 - S(16), hy - S(1), S(32), S(5), S(2), fMd);
+            t.fillRect(cx2 - S(15), hy - S(1), S(30), S(1) > 0 ? S(1) : 1, fLt);
+            t.fillRect(cx2 - S(15), hy + S(3), S(30), 1, fDk);
+            for (int k = -12; k <= 12; k += 4)
+                t.drawFastVLine(cx2 + S(k), hy + S(1), S(2), (k & 4) ? fDk : fLt);
+            // The propeller: two blades seen side on, so a turn is each one
+            // shrinking to the hub and growing out the other side. Whichever
+            // blade is swinging toward us is drawn last, over the other.
+            t.drawLine(ax, ay, tx, ty, fDk);
+            {
+                const float a = (float)(now % 700) / 700.0f * 6.2831853f;
+                const float c = cosf(a);
+                const int L = S(8), th = S(1) + 1;
+                const uint16_t bladeA = (uint16_t)0xD800, bladeB = (uint16_t)0x02BF;
+                auto blade = [&](float dir, uint16_t col) {
+                    int half = (int)(fabsf(c) * (float)L * 0.5f);
+                    if (half < 1) half = 1;
+                    const int bxc = tx + (int)(dir * (c >= 0 ? 1.0f : -1.0f) * (float)half);
+                    inked(ink, col, [&](int ox, int oy, uint16_t cc) {
+                        t.fillEllipse(bxc + ox, ty + oy, half, th, cc);
+                    });
+                };
+                const bool aFront = sinf(a) > 0.0f;
+                blade(aFront ? -1.0f : 1.0f, aFront ? bladeB : bladeA);
+                blade(aFront ? 1.0f : -1.0f, aFront ? bladeA : bladeB);
+                t.fillCircle(tx, ty, S(1), (uint16_t)0xFEC0);
+            }
+            // A glint that jumps between facets every few seconds.
+            const uint32_t gp = now % 4200;
+            if (gp < 360) {
+                static const int8_t G[3][2] = { {-8, -2}, {-2, -7}, {5, -2} };
+                const uint8_t k = (uint8_t)((now / 4200) % 3);
+                const int gx = cx2 + S(G[k][0]), gy = hy + S(G[k][1]);
+                const int arm = S(2) < 2 ? 2 : S(2);
+                t.drawFastHLine(gx - arm, gy, arm * 2 + 1, WHITE);
+                t.drawFastVLine(gx, gy - arm, arm * 2 + 1, WHITE);
+            }
+            break;
+        }
+        case OutfitId::SHADOW: {
+            // A navy ninja: red headband knotted at the side with two tails
+            // that flutter, a hood over the lower face with his eyes left in
+            // the slit, and a red sash with a throwing star tucked in it.
+            const uint16_t ink   = BLACK;
+            const uint16_t navy  = (uint16_t)0x212A;
+            const uint16_t navyL = (uint16_t)0x4A55;
+            const uint16_t red   = (uint16_t)0xD800;
+            const uint16_t redHi = (uint16_t)0xFB6A;
+            // Lower-face mask, kept below the shade line so his eyes
+            // stay visible -- covers mouth/jaw, not the lenses.
+            inked(ink, navy, [&](int ox, int oy, uint16_t c) {
+                t.fillRoundRect(cx2 - S(12) + ox, hy + S(14) + oy, S(24), S(10), S(4), c);
+            });
+            t.drawFastHLine(cx2 - S(9), hy + S(17), S(18), navyL);          // a fold
+            // The tails: two strips off the knot, each a travelling wave.
+            const float ph = (float)(now % 900) / 900.0f * 6.2831853f;
+            const int kx = cx2 + S(14), ky = hy + S(3);
+            for (uint8_t pass = 0; pass < 2; pass++)
+                for (uint8_t k = 0; k < 2; k++) {
+                    const int w = S(2) > 1 ? S(2) : 2;
+                    int px = kx, py = ky;
+                    for (uint8_t i = 1; i <= 3; i++) {
+                        const int nx = kx + S(4) * i;
+                        const int ny = ky + S(2 + k * 3) * i / 2 + (int)(sinf(ph - i * 1.3f + k) * (float)S(1) * i / 2);
+                        wideLine(t, px, py, nx, ny, pass == 0 ? w + 2 : w, pass == 0 ? ink : red);
+                        px = nx; py = ny;
+                    }
+                }
+            // The band and its knot.
+            inked(ink, red, [&](int ox, int oy, uint16_t c) {
+                t.fillRoundRect(cx2 - S(15) + ox, hy + S(1) + oy, S(30), S(4), S(1), c);
+                t.fillCircle(kx + ox, ky + oy, S(2) + 1, c);
+            });
+            t.drawFastHLine(cx2 - S(13), hy + S(1), S(24), redHi);
+            // The sash, knotted at his hip, one end hanging.
+            const int th = torsoHalf();
+            inked(ink, red, [&](int ox, int oy, uint16_t c) {
+                t.fillRect(cx2 - S(th) + ox, hy + S(32) + oy, S(2 * th), S(4), c);
+                t.fillTriangle(cx2 + S(5) + ox, hy + S(35) + oy, cx2 + S(9) + ox, hy + S(35) + oy,
+                               cx2 + S(8) + ox, hy + S(41) + oy, c);
+            });
+            t.drawFastHLine(cx2 - S(th) + 1, hy + S(32), S(2 * th) - 2, redHi);
+            // The throwing star, tucked in on the other side.
+            const uint16_t steel = (uint16_t)0xB5B5;
+            const int sx = cx2 - S(6), sy = hy + S(34), sr = S(2) + 1;
+            t.fillTriangle(sx - sr, sy, sx + sr, sy, sx, sy - sr - 1, steel);
+            t.fillTriangle(sx - sr, sy, sx + sr, sy, sx, sy + sr + 1, steel);
+            t.fillCircle(sx, sy, 1, ink);
+            break;
+        }
+        case OutfitId::PLUMBER:
+        case OutfitId::TALLBRO: {
+            // A cap with a dome, a bill and a letter on the front, a moustache
+            // in two lobes, and white gloves on the hands themselves. The
+            // overalls are on his torso and legs, in drawBody(), so his arms
+            // go over them. TALL BRO's cap is the taller of the two.
+            const bool tall = (outfit == OutfitId::TALLBRO);
+            const uint16_t ink   = BLACK;
+            const uint16_t cap   = tall ? (uint16_t)0x05A0 : (uint16_t)0xD800;
+            const uint16_t capDk = tall ? (uint16_t)0x0360 : (uint16_t)0x9000;
+            const uint16_t capHi = tall ? (uint16_t)0x6FEA : (uint16_t)0xFB6A;
+            const int top = tall ? S(9) : S(7);
+            // The corner radius is held to half the dome's height: a round
+            // rect asked for more than that folds its corners over each other
+            // and the cap came out as two lobes with a dip between them.
+            const int domeH = top + S(4);
+            const int domeR = S(7) < domeH / 2 ? S(7) : domeH / 2;
+            inked(ink, cap, [&](int ox, int oy, uint16_t c) {
+                t.fillRoundRect(cx2 - S(15) + ox, hy - top + oy, S(30), domeH, domeR, c);
+                t.fillEllipse(cx2 + S(3) + ox, hy + S(3) + oy, S(13), S(2) + 1, c);
+            });
+            t.fillRect(cx2 - S(14), hy + S(1), S(28), S(2), capDk);              // under the dome
+            t.fillEllipse(cx2 - S(8), hy - top + S(3), S(3), S(1) + 1, capHi);   // light on it
+            t.fillEllipse(cx2 + S(3), hy + S(3), S(13), S(2) + 1, capDk);        // the bill
+            t.drawFastHLine(cx2 - S(9), hy + S(2), S(22), capHi);
+            // The emblem: an S, for Potsy.
+            // Inside the dome, not riding its top edge: sized off the dome's
+            // own height so it never pokes out above the cap.
+            const int er = S(3) + 1;
+            const int ex = cx2 - S(1), ey = hy - top + er + S(1) + 1;
+            t.fillCircle(ex, ey, er + 1, ink);
+            t.fillCircle(ex, ey, er, WHITE);
+            const int p = (S(2) * 3) / 5;
+            if (p >= 1) capGlyph(t, ex - (3 * p) / 2, ey - (5 * p) / 2, p, cap);
+            // The moustache, two lobes over the top of his mouth.
+            const uint16_t tash = (uint16_t)0x4920;
+            inked(ink, tash, [&](int ox, int oy, uint16_t c) {
+                t.fillEllipse(cx2 - S(4) + ox, hy + S(15) + oy, S(5), S(2), c);
+                t.fillEllipse(cx2 + S(4) + ox, hy + S(15) + oy, S(5), S(2), c);
+            });
+            // Gloves on the hands drawBody() published, so they follow a wave.
+            const uint16_t crease = (uint16_t)0xB5B5;
+            const int gr = S(4);
+            t.fillCircle(s_armL1x, s_armL1y, gr + 1, ink);
+            t.fillCircle(s_armR1x, s_armR1y, gr + 1, ink);
+            t.fillCircle(s_armL1x, s_armL1y, gr, WHITE);
+            t.fillCircle(s_armR1x, s_armR1y, gr, WHITE);
+            t.drawFastHLine(s_armL1x - gr / 2, s_armL1y + gr / 3, gr, crease);
+            t.drawFastHLine(s_armR1x - gr / 2, s_armR1y + gr / 3, gr, crease);
+            break;
+        }
+        case OutfitId::SPACE: break;  // hercharm-gadget port: the suit render is stubbed for flash size; the
+                               // body layer in drawBody still draws (the pre-port state).
+        case OutfitId::BLUEBLUR: {
+            uint16_t blue = VAPOR_BLUE;
+            // Two swept-back quills, deliberately -- there used to be a
+            // third between them with its apex at hy - S(18), pointing
+            // straight up. It read as an antenna rather than a quill:
+            // it was the only one not swept back, it sat off the
+            // midline (cx+2..cx+10 rather than centered), and it
+            // overlapped the right quill, which starts at cx+6, leaving
+            // a visible seam where they crossed. The silhouette is the
+            // whole point of the homage, and it's cleaner with two.
+            //
+            // Those two live BEHIND his head now, with more beside them: see
+            // the quills in drawBody(). Drawn here, on top, their bases had to
+            // stop short of his lenses and they came out stubby.
+            (void)blue;
+            // White gloves -- a core, consistent trait across every
+            // era of the design this homages, and the one thing this
+            // outfit was missing that actually sells the reference.
+            // On the hands THEMSELVES (s_armL1x and friends, published by
+            // drawBody()), not at the resting hand position: fixed gloves
+            // stayed at his sides while the arms went up, and every raised
+            // pose showed two white balls floating where his hands had been.
+            t.fillCircle(s_armL1x, s_armL1y, S(4) + 1, BLACK);
+            t.fillCircle(s_armR1x, s_armR1y, S(4) + 1, BLACK);
+            t.fillCircle(s_armL1x, s_armL1y, S(4), WHITE);
+            t.fillCircle(s_armR1x, s_armR1y, S(4), WHITE);
+            // Shoes on the FEET, which stay planted when the body sinks into a
+            // crouch or a bow: at a fixed distance below hy they slid down
+            // and hung in the air under his soles.
+            //
+            // Outlined, with the white strap, gold buckle and white sole that
+            // make them those shoes rather than two red ovals.
+            {
+                const uint16_t shoe = (uint16_t)0xD800, shoeHi = (uint16_t)0xFB6A;
+                const int fx[2] = { s_footLx, s_footRx }, fy[2] = { s_footLy, s_footRy };
+                for (int k = 0; k < 2; k++) {
+                    inked(BLACK, shoe, [&](int ox, int oy, uint16_t c) {
+                        t.fillRoundRect(fx[k] - S(1) + ox, fy[k] - S(1) + oy, S(14), S(7), S(3), c);
+                    });
+                    t.drawFastHLine(fx[k] + S(1), fy[k] - S(1), S(8), shoeHi);
+                    t.fillRect(fx[k] - S(1) + 1, fy[k] + S(4), S(14) - 2, S(2), WHITE);
+                    t.fillRect(fx[k] + S(5), fy[k] - S(1), S(3), S(5), WHITE);
+                    t.fillRect(fx[k] + S(6), fy[k] + S(1), S(1) > 0 ? S(1) : 1, S(2), (uint16_t)0xFEC0);
+                }
+                // A puff of dust kicked up behind whichever foot just left the
+                // ground, while he walks.
+                if (m == Mood::WALK) {
+                    const uint32_t wp = now % 400;
+                    const int k = wp < 200 ? 0 : 1;
+                    const int age = (int)(wp % 200);
+                    const int pr = S(1) + age * S(2) / 200 + 1;
+                    const int px = fx[k] + (k == 0 ? -S(2) : S(13)) - (k == 0 ? age * S(3) / 200 : -age * S(3) / 200);
+                    t.fillCircle(px, fy[k] + S(4), pr, (uint16_t)0xB5B5);
+                }
+            }
+            break;
+        }
+        case OutfitId::CAPTAIN: {
+            // A pirate's hat, front on: the crown behind, the front brim turned
+            // up into two horns and a hump, gold braid along its edge and the
+            // skull and crossbones in the middle. The old one was two black
+            // triangles, which from across a room was a tent.
+            const uint16_t ink    = BLACK;
+            const uint16_t felt   = (uint16_t)0x212A;
+            const uint16_t feltHi = (uint16_t)0x4A55;
+            const uint16_t gold   = (uint16_t)0xFEC0;
+            // The brim's outline, left to right along the top.
+            static const int8_t B[9][2] = { {-17, 2}, {-19, -11}, {-9, -3}, {-5, -7}, {0, -8},
+                                            {5, -7}, {9, -3}, {19, -11}, {17, 2} };
+            auto brim = [&](int ox, int oy, uint16_t c) {
+                const int fx = cx2 + ox, fy = hy + S(1) + oy;
+                for (uint8_t i = 0; i < 9; i++) {
+                    const uint8_t j = (uint8_t)((i + 1) % 9);
+                    t.fillTriangle(fx, fy, cx2 + S(B[i][0]) + ox, hy + S(B[i][1]) + oy,
+                                   cx2 + S(B[j][0]) + ox, hy + S(B[j][1]) + oy, c);
+                }
+            };
+            inked(ink, felt, [&](int ox, int oy, uint16_t c) {
+                t.fillEllipse(cx2 + ox, hy - S(5) + oy, S(12), S(9), c);
+                brim(ox, oy, c);
+            });
+            t.fillEllipse(cx2 - S(4), hy - S(11), S(4), S(1) + 1, feltHi);   // light on the crown
+            brim(0, 0, felt);
+            for (uint8_t i = 1; i < 7; i++)
+                wideLine(t, cx2 + S(B[i][0]), hy + S(B[i][1]), cx2 + S(B[i + 1][0]), hy + S(B[i + 1][1]),
+                         S(1) + 1, gold);
+            // Crossbones, then the skull over them.
+            const int kx = cx2, ky = hy - S(3);
+            const int bw = S(1) + 1;
+            wideLine(t, kx - S(5), ky - S(3), kx + S(5), ky + S(3), bw, WHITE);
+            wideLine(t, kx + S(5), ky - S(3), kx - S(5), ky + S(3), bw, WHITE);
+            t.fillCircle(kx, ky - S(1), S(3), WHITE);
+            t.fillRect(kx - S(2), ky + S(1), S(4), S(2), WHITE);
+            const int ep = S(1) > 0 ? S(1) : 1;
+            t.fillRect(kx - S(2), ky - S(2), ep, ep, ink);
+            t.fillRect(kx + S(1), ky - S(2), ep, ep, ink);
+            // Eye patch strap only, not a filled patch, so the shades
+            // underneath stay visible.
+            wideLine(t, cx2 - S(11), hy + S(5), cx2 + S(14), hy + S(3), S(2), BLACK);
+            break;
+        }
+        case OutfitId::YZZERD: break;  // hercharm-gadget port: the front render is stubbed for flash size
+        case OutfitId::OVER9000: break;  // hercharm-gadget port: the front render is stubbed for flash size
+        case OutfitId::SHAMBLER: break;  // hercharm-gadget port: the front render is stubbed for flash size
+        default: break;
+    }
 }
 
 // Potsy's base design is ~68px tall (crest to shadow) at scale 1.0.
@@ -5122,178 +5587,14 @@ static uint16_t auraKey(uint32_t now, Mood m) {
 }
 
 static void auraBack(TFT_eSPI& t, int cx2, int hy, int ground, uint32_t now, Mood m, float scale) {
-    auto S = [scale](int v) { return (int)(v * scale); };
-    const bool asleep = (m == Mood::SLEEPY), alarm = (m == Mood::SHOCKED);
-    // Startled is one long surge; asleep there are none.
-    const float surge = alarm ? 1.0f : (asleep ? 0.0f : auraSurge(now));
-    const float tall  = asleep ? 0.45f : 1.0f;
-    const uint32_t per = alarm ? 450u : (asleep ? 1800u : 900u);
-    const uint32_t slot = now / (alarm ? 60u : 90u);
-    const uint16_t* col = asleep ? AURA_LOW : AURA_COL;
-    const float wt = (float)(now % per) / (float)per * 6.2831853f;
-
-    // Two costumes give him a head far wider than his own -- the parka's hood
-    // and the void eye's sphere -- and round his own head the fire was simply
-    // hidden behind them. For those the top six points of the path go round a
-    // circle the size of the costume instead.
-    int hoodR = 0, hoodY = 0;
-    {
-        const OutfitId fit = currentOutfit();
-        if (fit == OutfitId::PARKA)        { hoodR = 22; hoodY = 8; }
-        else if (fit == OutfitId::VOIDEYE) { hoodR = 20; hoodY = 14; }
-    }
-    // cos and sin of the six angles round that circle, in hundredths, from
-    // level with its middle up to straight over it.
-    static const int8_t HC[6] = { 99, 97, 81, 53, 24, 0 };
-    static const int8_t HS[6] = { -14, 24, 59, 85, 97, 100 };
-    auto pathPt = [&](uint8_t j) {
-        AuraPt p = AURA_PATH[j];
-        if (hoodR > 0 && j >= 6) {
-            p.x  = (int8_t)(-(hoodR * HC[j - 6]) / 100);
-            p.y  = (int8_t)(hoodY - (hoodR * HS[j - 6]) / 100);
-            p.dx = (int8_t)(-HC[j - 6] / 10);
-            p.dy = (int8_t)(-HS[j - 6] / 10 - 2);
-            p.in = 0;
-        }
-        return p;
-    };
-
-    // The body of the aura: four bands, blue against him out to pale yellow.
-    // It breathes rather than flickers -- one slow swell running up from his
-    // feet -- because the flicker is the gold's job, below. A whole sheet
-    // that jumps about reads as a cut-out being shaken, not as fire.
-    static const uint8_t CUT[5] = { 0, 34, 60, 82, 100 };
-    int   ex[AURA_N], ey[AURA_N];          // the outer edge of the body, for the licks
-    float wv[AURA_N];                     // how far up its lick each point is, 0..1
-    int px[5], py[5], qx[5], qy[5];
-    for (uint8_t i = 0; i < AURA_N; i++) {
-        const uint8_t j = i <= 11 ? i : (uint8_t)(22 - i);      // which table row
-        const int sg = i <= 11 ? 1 : -1;                         // mirrored on the right
-        const AuraPt p = pathPt(j);
-        const float sw = sinf((float)j * 0.9f - wt + (sg < 0 ? 1.6f : 0.0f));
-        // The lick wave: a sawtooth that climbs him. Each lick creeps out as
-        // it rises and then snaps back, which is what a flame's edge does and
-        // a ripple's does not. The two sides are half a wave apart.
-        float ph = (float)j * 0.36f - (float)(now % per) / (float)per + (sg < 0 ? 0.5f : 0.0f);
-        ph -= floorf(ph);
-        wv[i] = ph * ph;
-        // The body swells under each lick, so the gold is the tip of a
-        // bulge in the fire and not a spike stuck on a smooth shell.
-        float len = (float)p.len * tall * (0.52f + 0.08f * sw + 0.22f * wv[i] + 0.30f * surge);
-        // By his legs it never thins enough to let the background in.
-        if (j <= 2 && len < (float)p.len * tall * 0.86f) len = (float)p.len * tall * 0.86f;
-        const int bx = cx2 + sg * S(p.x);
-        int by = hy + S(p.y);
-        if (by > ground - 1) by = ground - 1;                    // a crouch: stay on the floor
-        const float ux = (float)(sg * p.dx) / 10.0f * scale, uy = (float)p.dy / 10.0f * scale;
-        qx[0] = bx; qy[0] = by;
-        for (uint8_t k = 1; k < 5; k++) {
-            const float d = (float)p.in + len * (float)CUT[k] / 100.0f;
-            qx[k] = bx + (int)(ux * d);
-            qy[k] = by + (int)(uy * d);
-        }
-        if (i > 0) {
-            for (uint8_t k = 0; k < 4; k++) {
-                t.fillTriangle(px[k], py[k], px[k + 1], py[k + 1], qx[k + 1], qy[k + 1], col[k]);
-                t.fillTriangle(px[k], py[k], qx[k + 1], qy[k + 1], qx[k], qy[k], col[k]);
-            }
-        }
-        for (uint8_t k = 0; k < 5; k++) { px[k] = qx[k]; py[k] = qy[k]; }
-        ex[i] = qx[4]; ey[i] = qy[4];
-    }
-    // The licks: one gold tooth on every stretch of the edge, its point thrown
-    // up and out from the higher end of the stretch, so they all lean the way
-    // fire leans. Together they are one unbroken gold edge.
-    for (uint8_t i = 0; i + 1 < AURA_N; i++) {
-        const uint8_t u  = i <= 10 ? (uint8_t)(i + 1) : i;              // the higher end
-        const uint8_t ju = u <= 11 ? u : (uint8_t)(22 - u);
-        const int sg = i <= 10 ? 1 : -1;
-        const AuraPt p = pathPt(ju);
-        const uint32_t h = yzHash(slot * 17u + i * 29u);
-        // At his feet they are short: thrown sideways along the floor they
-        // were needles.
-        const float L = (float)p.len * (ju <= 1 ? 0.40f : 0.80f) * tall
-                      * (0.22f + 0.78f * wv[u] + (float)(h & 63u) / 320.0f + 0.50f * surge) * scale;
-        // Out as much as up. Thrown nearly straight up they were needles
-        // down his sides, where the edge itself runs straight up.
-        const int ax = ex[u] + (int)((float)(sg * p.dx) / 10.0f * L * 0.95f);
-        const int ay = ey[u] + (int)((float)p.dy / 10.0f * L * 0.95f) - (int)(L * 0.50f);
-        t.fillTriangle(ex[i], ey[i], ex[i + 1], ey[i + 1], ax, ay, col[4]);
-        // A pale heart to each lick, so the gold is its rim.
-        const int mx = (ex[i] + ex[i + 1]) / 2, my = (ey[i] + ey[i + 1]) / 2;
-        t.fillTriangle((ex[i] + mx) / 2, (ey[i] + my) / 2, (ex[i + 1] + mx) / 2, (ey[i + 1] + my) / 2,
-                       mx + (ax - mx) * 48 / 100, my + (ay - my) * 48 / 100, col[3]);
-    }
-    // Wisps: bright threads climbing through the blue, three a side, so the
-    // inside of the aura is moving too and not only its edge.
-    if (!asleep) {
-        for (uint8_t k = 0; k < 6; k++) {
-            const int sg = (k & 1) ? -1 : 1;
-            const uint32_t wp = (now + (uint32_t)k * 517u) % 1500u;
-            const float f = 1.0f + (float)wp / 1500.0f * 4.9f;          // which stretch of the path: his legs and sides
-            const uint8_t j0 = (uint8_t)f;
-            const float fr = f - (float)j0;
-            const AuraPt& a = AURA_PATH[j0];
-            const AuraPt& b = AURA_PATH[j0 + 1];
-            // A third of the way out across the body of the aura.
-            const float x0 = (float)a.x + (float)a.dx / 10.0f * ((float)a.in + (float)a.len * 0.26f);
-            const float y0 = (float)a.y + (float)a.dy / 10.0f * ((float)a.in + (float)a.len * 0.26f);
-            const float x1 = (float)b.x + (float)b.dx / 10.0f * ((float)b.in + (float)b.len * 0.26f);
-            const float y1 = (float)b.y + (float)b.dy / 10.0f * ((float)b.in + (float)b.len * 0.26f);
-            const float wx = x0 + (x1 - x0) * fr, wy = y0 + (y1 - y0) * fr;
-            const int sx = cx2 + sg * (int)(wx * scale), sy = hy + (int)(wy * scale);
-            const int tx = cx2 + sg * (int)((wx + (x1 - x0) * 0.7f) * scale), ty = hy + (int)((wy + (y1 - y0) * 0.7f) * scale);
-            // Two plain lines side by side. wideLine's round ends made each
-            // wisp a little cross.
-            t.drawLine(sx, sy, tx, ty, col[2]);
-            t.drawLine(sx + sg, sy, tx + sg, ty, col[2]);
-        }
-    }
-    if (alarm) {
-        // Startled: two rings of light chasing each other outward along the
-        // floor, the way YZZERD's circle bursts.
-        for (uint8_t k = 0; k < 2; k++) {
-            const uint32_t ph = (now + (uint32_t)k * 260u) % 520u;
-            const int rx = S(18) + (int)(ph * (uint32_t)S(20) / 520u);
-            t.drawEllipse(cx2, ground - S(1), rx, (rx * 5) / 27, ph < 300u ? AURA_COL[3] : AURA_COL[4]);
-        }
-    }
-    if (asleep) return;
-    // Embers: gold sparks let go by the edge, drifting up and out and dying.
-    for (uint8_t i = 0; i < 9; i++) {
-        const uint32_t tt = (alarm ? now * 2u : now) + (uint32_t)i * 148u;
-        const uint32_t ph = tt % 1330u;
-        const uint32_t h = yzHash(tt / 1330u * 19u + i);
-        const int side = (h & 1u) ? 1 : -1;
-        const int x0 = cx2 + side * S(8 + (int)((h >> 1) % 18u));
-        const int y0 = hy + S((int)((h >> 8) % 40u)) - S(12);
-        const int ex = x0 + side * (int)(ph * (uint32_t)S(5) / 1330u);
-        const int ey = y0 - (int)(ph * (uint32_t)S(16) / 1330u);
-        if (ph < 600u)       t.fillRect(ex - 1, ey - 1, 3, 3, AURA_COL[4]);
-        else if (ph < 1050u) t.fillRect(ex, ey, 2, 2, AURA_COL[4]);
-        else                 t.drawPixel(ex, ey, AURA_COL[3]);
-    }
+    // hercharm-gadget port: the Legend aura is stubbed (hasAura() is always false here).
 }
 
 // In front of him: a thread of lightning, now and then. Three short lines
 // from a place hashed off the clock, for a tenth of a second; twice as often
 // while he is startled, never while he sleeps.
 static void auraFront(TFT_eSPI& t, int cx2, int hy, int ground, uint32_t now, Mood m, float scale) {
-    auto S = [scale](int v) { return (int)(v * scale); };
-    (void)ground;
-    if (m == Mood::SLEEPY) return;
-    const uint32_t per = (m == Mood::SHOCKED) ? 450u : 1900u;
-    if ((now % per) >= 110u) return;
-    const uint32_t h = yzHash(now / per * 23u + 5u);
-    const int side = (h & 1u) ? 1 : -1;
-    int x = cx2 + side * S(6 + (int)((h >> 1) % 12u)), y = hy + S(6 + (int)((h >> 6) % 34u));
-    for (uint8_t i = 0; i < 3; i++) {
-        const uint32_t g = yzHash(h + i * 7u);
-        const int nx = x + side * (i == 1 ? -S(2) : S(3 + (int)(g % 3u))), ny = y + S(3 + (int)((g >> 4) % 4u));
-        t.drawLine(x, y, nx, ny, TFT_WHITE);
-        t.drawLine(x + 1, y, nx + 1, ny, AURA_COL[2]);
-        x = nx; y = ny;
-    }
+    // hercharm-gadget port: the Legend aura is stubbed (hasAura() is always false here).
 }
 
 // Draws Potsy at an already-animated anchor (hy = head-top Y for this
@@ -5313,103 +5614,7 @@ static void auraFront(TFT_eSPI& t, int cx2, int hy, int ground, uint32_t now, Mo
 // chain goes, and only ours wears the chain.
 static void ankleCuff(TFT_eSPI& t, float scale, bool own);
 static void prisonStripes(TFT_eSPI& t, int cx2, int hy, float scale, uint16_t furMain, uint16_t furLight, bool own) {
-    auto S = [scale](int v) { return (int)(v * scale); };
-    // From the shoulders down -- or from his hands, when they are up in the
-    // air: nothing but arms is drawn above his shoulders yet.
-    int y0 = hy + S(22);
-    const int handTop = (s_armL1y < s_armR1y ? s_armL1y : s_armR1y) - S(5);
-    if (handTop < y0) y0 = handTop;
-    if (y0 < 0) y0 = 0;
-    int y1 = (s_footLy < s_footRy ? s_footLy : s_footRy);
-    if (y1 > t.height()) y1 = t.height();
-    int x0 = cx2 - S(30), x1 = cx2 + S(30);
-    if (x0 < 0) x0 = 0;
-    if (x1 > t.width()) x1 = t.width();
-    if (y1 <= y0 || x1 <= x0 || !DrawBand::has(y0, y1)) return;
-    // What the frame hands back for each fur colour: the colour itself on a
-    // 16-bit frame, its 8-bit cousin on an 8-bit one. Found by asking it,
-    // on a pixel put straight back.
-    const int py = DrawBand::top(y0);
-    if (py >= y1) return;
-    const uint16_t keep = t.readPixel(x0, py);
-    t.drawPixel(x0, py, furMain);  const uint16_t qM = t.readPixel(x0, py);
-    t.drawPixel(x0, py, furLight); const uint16_t qL = t.readPixel(x0, py);
-    t.drawPixel(x0, py, keep);
-    if (qM == qL) return;               // the frame could not tell them apart: leave him be
-    const int torsoTop = hy + S(23);
-    int band = (int)lroundf(1.48f * scale);
-    if (band < 2) band = 2;
-    const uint16_t BODY_W = (uint16_t)0xE73B, BODY_D = (uint16_t)0x18E3;
-    const uint16_t ARM_W  = Theme::WHITE,              ARM_D  = (uint16_t)0x31A7;
-    const uint16_t LIT    = (uint16_t)0xCE58, SHADE = (uint16_t)0x0862;
-    const int hr = S(4) + 1, hr2 = hr * hr;
-    static uint8_t cls[512];
-    const int yA = DrawBand::top(y0), yB = DrawBand::bot(y1);
-    // The frame sprite is read straight from its buffer, a byte a pixel,
-    // against the fur colours' own 8-bit codes: through readPixel() this
-    // loop was 7-9 ms a frame on the 3.2in (measured 2026-10-06).
-#if defined(ARDUINO_ARCH_ESP32)
-    const FastSprite* fs = (g_frameSprite && (TFT_eSPI*)g_frameSprite == &t) ? g_frameSprite : nullptr;
-    const uint8_t cM8 = (uint8_t)t.color16to8(furMain), cL8 = (uint8_t)t.color16to8(furLight);
-#endif
-    for (int y = yA; y < yB; y++) {
-        const bool dark = (((y - torsoTop) + band * 64) / band) & 1;
-        const int n = x1 - x0 > 512 ? 512 : x1 - x0;
-        const int dyL = (y - s_armL1y) * (y - s_armL1y), dyR = (y - s_armR1y) * (y - s_armR1y);
-        auto handAt = [&](int x) { return (x - s_armL1x) * (x - s_armL1x) + dyL <= hr2 || (x - s_armR1x) * (x - s_armR1x) + dyR <= hr2; };
-#if defined(ARDUINO_ARCH_ESP32)
-        const uint8_t* row = fs ? fs->row8(y) : nullptr;
-        if (row) {
-            const uint8_t* p = row + x0;
-            for (int i = 0; i < n; i++) {
-                const uint8_t v = p[i];
-                cls[i] = v == cM8 ? 1 : (v == cL8 ? (handAt(x0 + i) ? 0 : 2) : 0);
-            }
-        } else
-#endif
-        for (int i = 0; i < n; i++) {
-            const int x = x0 + i;
-            const uint16_t c = t.readPixel(x, y);
-            uint8_t k = 0;
-            if (c == furMain || c == qM) k = 1;
-            else if (c == furLight || c == qL) k = handAt(x) ? 0 : 2;
-            cls[i] = k;
-        }
-        for (int i = 0; i < n; ) {
-            if (!cls[i]) { i++; continue; }
-            int e = i;
-            while (e + 1 < n && cls[e + 1]) e++;
-            // inside the run, one span per kind; the two ends shaded
-            for (int a = i; a <= e; ) {
-                int b = a;
-                while (b + 1 <= e && cls[b + 1] == cls[a]) b++;
-                const uint16_t col = cls[a] == 1 ? (dark ? BODY_D : BODY_W) : (dark ? ARM_D : ARM_W);
-                t.drawFastHLine(x0 + a, y, b - a + 1, col);
-                a = b + 1;
-            }
-            if (e > i) { t.drawPixel(x0 + i, y, LIT); t.drawPixel(x0 + e, y, SHADE); }
-            i = e + 1;
-        }
-    }
-    // The number patch on his chest: 1337, in the little 3x5 digits where he
-    // is big enough to read them.
-    {
-        const int w = S(8) > 8 ? S(8) : 8, h = S(3) > 5 ? S(3) + 1 : 5;
-        const int px0 = cx2 - w / 2 + S(2), py0 = torsoTop + S(3);
-        t.fillRect(px0 - 1, py0 - 1, w + 2, h + 2, Theme::BLACK);
-        t.fillRect(px0, py0, w, h, Theme::WHITE);
-        if (scale >= 1.9f) {
-            static const uint8_t D1[5] = { 2, 6, 2, 2, 7 }, D3[5] = { 7, 1, 7, 1, 7 }, D7[5] = { 7, 1, 2, 2, 2 };
-            const uint8_t* dig[4] = { D1, D3, D3, D7 };
-            int tx = px0 + (w - 15) / 2;
-            const int ty = py0 + (h - 5) / 2;
-            for (int d = 0; d < 4; d++, tx += 4)
-                for (int r = 0; r < 5; r++)
-                    for (int k = 0; k < 3; k++)
-                        if (dig[d][r] & (4 >> k)) t.drawPixel(tx + k, ty + r, Theme::BLACK);
-        }
-    }
-    ankleCuff(t, scale, own);
+    // hercharm-gadget port: the jail sentence is stubbed (jailed() is always false here).
 }
 
 // The iron cuff on his right ankle, and its ring: worn in STRIPES, and
@@ -5723,7 +5928,7 @@ static void drawBody(TFT_eSPI& t, int cx, int hy, int headTopY, uint32_t now, Mo
     // ---- YZZERD's rune circle and the far half of his orb's orbit ----------
     // Behind him like the wings, the hide and the tail. The ground is where
     // his soles are, which a crouch leaves put while hy sinks.
-    if (outfitNow == OutfitId::YZZERD) yzBack(t, cx2, hy, hy + S(55) - crouch, now, m, scale);
+    if (false) yzBack(t, cx2, hy, hy + S(55) - crouch, now, m, scale);  // hercharm-gadget port: YZZERD renders stubbed for flash size
     if (t3) t3Back(t, cx2, hy, hy + S(55) - crouch, now, m, scale);
 
     // Shadow (fixed, doesn't bob)
@@ -6099,9 +6304,9 @@ static void drawBody(TFT_eSPI& t, int cx, int hy, int headTopY, uint32_t now, Mo
         for (int8_t sg = -1; sg <= 1; sg += 2)
             for (int k = 0; k < 2; k++) t.fillCircle(cx2 + sg * S(6), hy + S(27) + k * S(4), S(1), gold);
     } else if (outfitNow == OutfitId::YZZERD) {
-        yzRobe(t, cx2, hy, scale);
+        // hercharm-gadget port: the YZZERD renders are stubbed for flash size.
     } else if (outfitNow == OutfitId::OVER9000) {
-        o9Gi(t, cx2, hy, hy + S(55) - crouch, now, scale);
+        // hercharm-gadget port: the OVER9000 renders are stubbed for flash size.
     } else if (outfitNow == OutfitId::SHAMBLER) {
         shBody(t, cx2, hy, scale);
     } else if (t3) {
@@ -6484,8 +6689,8 @@ static void drawBody(TFT_eSPI& t, int cx, int hy, int headTopY, uint32_t now, Mo
     // the whole hood stops reading.
     if (outfitNow == OutfitId::PARKA) { furMain = FUR_MAIN; furLight = FUR_LIGHT; }
     // YZZERD the same, after the sleeves and collar go on behind his head.
-    if (outfitNow == OutfitId::YZZERD) { yzBehindHead(t, cx2, hh, scale); furMain = furMain0; furLight = furLight0; }
-    if (outfitNow == OutfitId::OVER9000) { o9BehindHead(t, cx2, hh, scale); furMain = furMain0; furLight = furLight0; }
+    if (false) { yzBehindHead(t, cx2, hh, scale); }  // hercharm-gadget port: YZZERD renders stubbed for flash size; fur stays as drawn
+    if (false) { o9BehindHead(t, cx2, hh, scale); }  // hercharm-gadget port: OVER9000 renders stubbed for flash size; fur stays as drawn
     if (t3) { t3BehindHead(t, cx2, hh, scale); furMain = furMain0; furLight = furLight0; }
 
     // VOID EYE replaces his head outright with the sphere drawn in
@@ -6493,7 +6698,7 @@ static void drawBody(TFT_eSPI& t, int cx, int hy, int headTopY, uint32_t now, Mo
     // then painted over -- his skull is wider than the sphere and its edges
     // would show around it. Everything inside keeps its original indentation
     // so this stays a two-line change instead of a two-hundred-line reformat.
-    if (outfitNow == OutfitId::STRIPES) prisonStripes(t, cx2, hy, scale, furMain, furLight, s_outfitOverride < 0);
+    if (false) prisonStripes(t, cx2, hy, scale, furMain, furLight, s_outfitOverride < 0);  // hercharm-gadget port: the jail sentence is stubbed (jailed() is always false here)
     else if (s_outfitOverride < 0 && ballPetOn()) ankleCuff(t, scale, true);
     const bool hideFace = (outfitNow == OutfitId::VOIDEYE);
     // PARKA has no mouth. Guarded at each draw rather than painted over

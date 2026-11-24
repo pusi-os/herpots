@@ -20,14 +20,16 @@ void set_storage(hg::Storage* store);
 void draw_hero(hg::Canvas& c, int cx, int top_y, int avail_h, uint32_t now_ms, bool talking);
 
 // Paints the hero band's backdrop. Always true (it drew): DIGITAL is the
-// rain, the other values are distinguishable dark solids. The rain is a pure
-// function of `now_ms`, so banded framebuffer redraws agree.
+// rain, the other values are their own animated scenes (the paint_* renderers
+// in glue.cpp, all pure functions of now_ms). The rain is a pure function of
+// `now_ms`, so banded framebuffer redraws agree.
 bool paint_background(hg::Canvas& c, int x, int y, int w, int h, uint32_t now_ms);
 
-// A small standing cameo for screens that want him without the state
-// machine (the clock face's avatar slot): feet on `base_y`, height about
-// 58*scale px, idle bob only, no speech bubble.
-void draw_mini_hero(hg::Canvas& c, int cx, int base_y, uint32_t now_ms, float scale);
+// The clock face's avatar slot: a full tick() of the same Potsy the hero band
+// draws — the whole pose machine, bouncing and reacting — with his speech
+// bubble held off so his idle chatter never covers the time and the date.
+// `top_y`/`avail_h` are the slot's band: he sizes himself to fill it.
+void draw_mini_hero(hg::Canvas& c, int cx, int top_y, int avail_h, uint32_t now_ms);
 
 // rain.cpp: the rain renderer paint_background() delegates to.
 bool paint_rain(hg::Canvas& c, int x, int y, int w, int h, uint32_t now_ms);

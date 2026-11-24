@@ -24,9 +24,9 @@ namespace Settings {
     };
     static constexpr uint8_t BACKGROUND_COUNT = 12;
 
-    // The only drawn background in this port is the DIGITAL rain (potsy
-    // glue's rain.cpp); the other values are kept for the persona protocol
-    // and the easter-egg switches, and map to DIGITAL at draw time.
+    // DIGITAL is the DIGITAL-rain renderer (potsy glue's rain.cpp); the other
+    // values are their own animated scenes (the paint_* renderers in
+    // glue.cpp), all pure functions of the frame clock. BLACK stays black.
     inline uint8_t  s_background = static_cast<uint8_t>(Background::DIGITAL);
     inline bool     s_backgroundLoaded = false;
 

@@ -2698,7 +2698,9 @@ void Ui::draw_clock(const UiModel& m) {
   // shift (edge_ring), and a new second moves only the dot (draw_frame, update_ring).
   const uint32_t key = Hash().add(m.clock_time).add(m.clock_date).val(m.clock_minute).val(m.shift_step).val(m.lang)
                            .add(m.face ? m.face->hash : std::string()).get();
-  if (valid_ && full_face_ == FullFace::Clock && key == face_hash_) return;  // invalidate() repaints it too
+  // Potsy's cameo on the clock is animated (a full tick(), repaint per frame), so the
+  // once-per-minute early return only applies to the static mascot face.
+  if (!m.potsy && valid_ && full_face_ == FullFace::Clock && key == face_hash_) return;  // invalidate() repaints it too
   full_face_ = FullFace::Clock;
   face_hash_ = key;
   valid_ = true;  // leaving the face repaints everything anyway (draw_frame)
@@ -2811,8 +2813,7 @@ void Ui::draw_clock(const UiModel& m) {
       // The profile's Hermes avatar, or — for Potsy builds — the same Potsy
       // as the hero band, sized to the avatar's slot: same character, smaller.
       if (m.potsy)
-        potsy_glue::draw_mini_hero(panel, cx + dx, face_y + face.size + dy, m.now_ms,
-                                   face.size / 64.0f * 0.9f);
+        potsy_glue::draw_mini_hero(panel, cx + dx, face_y + dy, face.size, m.now_ms);
       else
         draw_face(panel, cx + dx - face.size / 2, face_y + dy, face, m.face, kText);
     }
