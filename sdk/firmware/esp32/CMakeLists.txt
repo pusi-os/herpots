@@ -32,7 +32,9 @@ endif()
 # The firmware version: reported to Hermes and written into the image, where
 # `hermes gadget update` reads it. Override with -DPROJECT_VER=...
 if(NOT DEFINED PROJECT_VER)
-    set(PROJECT_VER "0.6.0")
+    # Keep Major.Minor in step with plugin/pyproject.toml so `hermes herpots devices` names
+    # the build a user is running; the patch counter marks firmware-only fixes.
+    set(PROJECT_VER "0.7.1")
 endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

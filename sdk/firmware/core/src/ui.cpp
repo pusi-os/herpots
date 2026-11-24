@@ -1855,14 +1855,26 @@ Ui::HeroGeom Ui::hero_geom(const UiModel& m) const {
   g.name_h = m.name_target ? std::max(2 * lh + s, touch_px_) : 0;
   const int reserved = m.screen == Screen::Responding ? max_lines : 1;
   const int ch = caption_h(std::max<int>(reserved, static_cast<int>(g.detail.size()))) + std::max(0, g.name_h - (2 * lh + s));
-  const int avail = std::min(w - 8 * s, layout_.main_h - ch - buttons_h - 4 * s);
+  // The glass plate is the one caption that may grow past what the band leaves him: an answer
+  // is worth more than his feet, so the plate takes up to kGlassLines rows and may overlap him
+  // by kGlassOverlap rows. The mascot is sized for the rest, never below the smallest bitmap.
+  int glass_h = 0, overlap = 0;
+  if (!m.glass_text.empty() && m.caption_lines > 0) {
+    const int plate_avail = layout_.main_h - buttons_h - 2 * s;
+    const int want = (1 + std::max(1, static_cast<int>(m.caption_lines))) * lh + s;
+    glass_h = std::min(want, std::max(caption_h(1), plate_avail));
+    const int free_h = layout_.main_h - glass_h - buttons_h - 4 * s;
+    if (free_h < smallest) overlap = std::min(smallest - std::max(free_h, 0), glass_h / 2);
+  }
+  const int total_ch = glass_h ? glass_h : ch;
+  const int avail = std::min(w - 8 * s, layout_.main_h - total_ch - buttons_h - 4 * s + overlap);
   const int limit = panel_.mascot_px ? std::min(avail, static_cast<int>(panel_.mascot_px)) : avail;
   g.size = mascot::pick(limit, mascot::Frame::Idle)->size;
-  const int block = g.size + 2 * s + ch + buttons_h;
+  const int block = g.size + 2 * s + total_ch + buttons_h;
   g.x = (w - g.size) / 2;
-  g.y = layout_.main_y + std::max(s, (layout_.main_h - block) / 2);
+  g.y = layout_.main_y + std::max(s, (layout_.main_h - block) / 2) - overlap;
   g.caption_y = g.y + g.size + 2 * s;
-  g.buttons_y = g.caption_y + ch + 2 * s;
+  g.buttons_y = g.caption_y + total_ch + 2 * s;
   return g;
 }
 

@@ -865,6 +865,7 @@ class App {
   bool reply_unread_ = false;
   bool cancel_held_ = false;
   bool cancel_long_fired_ = false;
+  bool cancel_stop_fired_ = false;  // the hold already stopped the turn; its release does nothing
   uint32_t cancel_down_at_ = 0;
   std::string status_;
   std::string user_echo_;

@@ -57,11 +57,17 @@ constexpr uint32_t kTurnTimeoutMs = 30 * 60000;   // ...once its turn.start says
 constexpr uint32_t kSettleAfterReplyMs = 6000;
 constexpr uint32_t kNewSessionHoldMs = 2000;  // hold CANCEL this long to start a new session
 constexpr uint32_t kNewSessionHintMs = 600;   // ...and show the countdown after this long
+// CANCEL during a turn: a short press shows the sessions (what it did on the Ready screen), and
+// stopping the turn is the HOLD. A press that merely taps CANCEL to look at the board must not
+// throw the answer away.
+constexpr uint32_t kStopTurnHoldMs = 800;     // hold CANCEL this long to stop the turn
+constexpr uint32_t kStopTurnHintMs = 300;     // ...and show that the hold will stop it
 constexpr uint32_t kPromptArmMs = 600;        // presses this soon after a question appears don't answer it
 constexpr uint32_t kPageLineMs = 1000;        // long text: reading time per line before the next page
 constexpr uint32_t kManualScrollPauseMs = 15000;  // UP/DOWN pauses automatic paging this long
 constexpr uint8_t kCaptionLines = 3;          // detail lines on pairing, setup and card screens
 constexpr uint8_t kPromptLines = 4;           // ...and on a question (the renderer drops lines on small screens)
+constexpr uint8_t kGlassLines = 6;            // rows the glass reply plate under Potsy may use
 constexpr uint32_t kFrameMs = 100;
 constexpr uint32_t kSensorIntervalMs = 2000;
 constexpr uint32_t kDefaultCardMs = 15000;
@@ -1972,6 +1978,7 @@ void App::on_button(Button button, bool pressed, bool touch) {
         cancel_held_ = true;
         cancel_down_at_ = now();
         cancel_long_fired_ = false;
+        cancel_stop_fired_ = false;
         camera_touch_at_ = now();
       } else if (cancel_held_) {
         cancel_held_ = false;
@@ -2022,12 +2029,13 @@ void App::on_button(Button button, bool pressed, bool touch) {
         cancel_held_ = true;
         cancel_down_at_ = now();
         cancel_long_fired_ = false;
+        cancel_stop_fired_ = false;
         if (talk_held_ && mode_ == Mode::Listening) cancel_listening("cancelled");
         return;
       }
       if (!cancel_held_) return;
       cancel_held_ = false;
-      if (cancel_long_fired_) return;
+      if (cancel_long_fired_ || cancel_stop_fired_) { cancel_stop_fired_ = false; return; }
       if (choice_showing()) {
         // Without Up/Down or touch, CANCEL steps through the answers; the last row cancels.
         if (choice_steps() && !touch) choice_move(+1, true);
@@ -2036,7 +2044,16 @@ void App::on_button(Button button, bool pressed, bool touch) {
         if (prompt_armed(cancel_down_at_)) answer_prompt(false);
       } else if (mode_ == Mode::Listening) cancel_listening("cancelled");
       else if (overlay_ != Overlay::None) dismiss_overlay();
-      else if (mode_ == Mode::Thinking || mode_ == Mode::Responding) cancel_turn();
+      else if (mode_ == Mode::Thinking || mode_ == Mode::Responding) {
+        // Stopping the turn is the HOLD (fired from tick()); a short press shows the sessions,
+        // as it does on the Ready screen, so looking at the board never discards the answer.
+        if (dashboard_ready_ && paired_) {
+          overlay_ = Overlay::Dashboard;
+          overlay_until_ = 0;
+          dash_scroll_ = 0;
+          page_at_ = now() + page_dwell_ms();
+        }
+      }
       else if (interpret_ && can_talk()) send(proto::message("interpret.flip"));  // the other one speaks next
       else if (dashboard_ready_ && paired_) {
         overlay_ = Overlay::Dashboard;
@@ -2054,13 +2071,17 @@ void App::on_button(Button button, bool pressed, bool touch) {
         return;
       }
       if (!pressed) {
-        // UP's release decides what its press meant on the Ready screen: a quick press opened
-        // the profile grid, a held one brings the last reply back.
+        // UP's release decides what its press meant on the Ready screen: a quick press opens
+        // the profile grid (or Settings when there is only one profile, so the lone spare
+        // button still reaches the menu), a held one brings the last reply back.
         if (button == Button::Up && up_down_at_ && mode_ == Mode::Idle && overlay_ == Overlay::None &&
-            agent_profiles_.size() > 1 && !settings_open() && !widgets_open()) {
+            !settings_open() && !widgets_open()) {
           const bool quick = now() - up_down_at_ < 700;
           up_down_at_ = 0;
-          if (quick) open_profile_picker();
+          if (quick) {
+            if (agent_profiles_.size() > 1) open_profile_picker();
+            else open_settings();
+          }
           else {
             page_at_ = now() + kManualScrollPauseMs;
             (void)show_reply_text();
@@ -2071,8 +2092,7 @@ void App::on_button(Button button, bool pressed, bool touch) {
         break;
       }
       if (button == Button::Up && mode_ == Mode::Idle && overlay_ == Overlay::None &&
-          agent_profiles_.size() > 1 && !settings_open() && !widgets_open() && !choice_showing() &&
-          !prompt_showing()) {
+          !settings_open() && !widgets_open() && !choice_showing() && !prompt_showing()) {
         up_down_at_ = now();  // the release decides: quick = the profile grid, held = the last reply
         return;
       }
@@ -2884,7 +2904,18 @@ void App::tick() {
   }
   if (cancel_held_ && !talk_held_ && !settings_open() && !cancel_long_fired_ && !prompt_showing() && !camera_open_) {
     uint32_t held = t - cancel_down_at_;
-    if (held >= kNewSessionHoldMs) {
+    // During a turn the hold stops it; elsewhere the long hold starts a new session.
+    const bool in_turn = (mode_ == Mode::Thinking || mode_ == Mode::Responding) && !cancel_stop_fired_;
+    if (in_turn && held >= kStopTurnHoldMs) {
+      cancel_stop_fired_ = true;
+      cancel_turn();
+      update_model();
+    } else if (in_turn && held >= kStopTurnHintMs && can_talk()) {
+      if (hint_flash_ != tr(i18n::Msg::ButtonToStop, {control(profile_.cancel_label)})) {
+        set_hint_flash(tr(i18n::Msg::ButtonToStop, {control(profile_.cancel_label)}));
+        update_model();
+      }
+    } else if (held >= kNewSessionHoldMs) {
       cancel_long_fired_ = true;
       start_new_session();
       update_model();
@@ -3290,6 +3321,9 @@ void App::update_model() {
     if (potsy_ && !interpret_) {
       m.hero = true;
       m.glass_text = reply_;
+      // The plate under him carries up to six wrapped rows: the room is there, and an answer
+      // read in one glance beats one that scrolls.
+      m.caption_lines = kGlassLines;
     }
     // While it is spoken, the face talks over the reply's latest two lines, where they fit.
     if (interpret_) {
@@ -3319,6 +3353,7 @@ void App::update_model() {
     if (potsy_ && showing_reply && !interpret_) {
       m.hero = true;
       m.glass_text = reply_;
+      m.caption_lines = kGlassLines;
     }
     if (m.hero) {
       const bool switching = agent_profiles_.size() > 1;
