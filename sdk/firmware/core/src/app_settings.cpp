@@ -7,8 +7,7 @@
 #include "hg/wifi_networks.hpp"
 
 #include "potsy/potsy_glue.hpp"
-
-#include "potsy/potsy_glue.hpp"
+#include "potsy/settings.h"
 
 namespace hg {
 
@@ -26,6 +25,9 @@ bool App::menu_offered(Menu item) const {
     case Menu::Profile: return agent_profiles_.size() > 1;
     case Menu::Outfit: return potsy_;
     case Menu::Background: return potsy_;
+    case Menu::Banter: return potsy_;
+    case Menu::Tempo: return potsy_;
+    case Menu::Mini: return potsy_;
     case Menu::ProfileGrid: return profile_.touch_screen && agent_profiles_.size() > 1 && hal_.display != nullptr;
     case Menu::Power: return hal_.power != nullptr;
     case Menu::BatteryAlert: return hal_.power != nullptr && hal_.display != nullptr;
@@ -138,6 +140,23 @@ void App::settings_input(Button button, bool pressed) {
       break;
     case Menu::Background:
       potsy_glue::cycle_background();
+      break;
+    case Menu::Banter:
+      // Quiet, normal, talkative, then round again.
+      potsy_glue::select_banter(static_cast<uint8_t>((Settings::banter() + 1) % 3));
+      break;
+    case Menu::Tempo: {
+      // 60, 80, 100, 120, 150, 200 percent, then round again.
+      static const uint8_t kSteps[] = {60, 80, 100, 120, 150, 200};
+      const uint8_t now = potsy_glue::tempo_percent();
+      size_t next = 0;
+      for (size_t i = 0; i < sizeof(kSteps); ++i)
+        if (now == kSteps[i]) next = (i + 1) % sizeof(kSteps);
+      potsy_glue::select_tempo(kSteps[next]);
+      break;
+    }
+    case Menu::Mini:
+      potsy_glue::select_mini(!potsy_glue::mini_on_clock());
       break;
     case Menu::TalkMode:
       if (hal_.mic) console(talk_mode_ == TalkMode::Hold ? "set talk_mode tap" : "set talk_mode hold");
@@ -358,6 +377,9 @@ SettingRow App::settings_row(Menu item, const std::string& label, const std::str
       break;
     case Menu::Outfit: row.icon = Icon::Person; break;
     case Menu::Background: row.icon = Icon::Screen; break;
+    case Menu::Banter: row.icon = Icon::Note; break;
+    case Menu::Tempo: row.icon = Icon::Note; break;
+    case Menu::Mini: row.icon = Icon::Person; row.kind = Kind::Toggle; row.level = potsy_glue::mini_on_clock(); break;
     case Menu::Profile: row.icon = Icon::Person; break;
     case Menu::ProfileGrid: row.icon = Icon::Grid; break;
     case Menu::Microphone: row.icon = Icon::Mic; row.kind = Kind::Action; break;
@@ -505,6 +527,18 @@ void App::settings_item(Menu item, UiModel& m) const {
     case Menu::Outfit:
       m.detail = tr(Msg::OutfitSetting);
       m.body = std::string(potsy_glue::outfit_label()) + "\n" + tr(Msg::ChangesSaved);
+      break;
+    case Menu::Banter:
+      m.detail = tr(Msg::BanterSetting);
+      m.body = std::string(potsy_glue::banter_label()) + "\n" + tr(Msg::ChangesSaved);
+      break;
+    case Menu::Tempo:
+      m.detail = tr(Msg::TempoSetting);
+      m.body = std::to_string(potsy_glue::tempo_percent()) + "%\n" + tr(Msg::ChangesSaved);
+      break;
+    case Menu::Mini:
+      m.detail = tr(Msg::MiniSetting);
+      m.body = std::string(potsy_glue::mini_label()) + "\n" + tr(Msg::ChangesSaved);
       break;
     case Menu::Background:
       m.detail = tr(Msg::BackgroundSetting);

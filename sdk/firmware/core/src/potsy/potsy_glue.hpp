@@ -41,12 +41,27 @@ void select_background(uint8_t value);
 // True while the drawn backdrop is the DIGITAL rain (the settings row's body).
 bool background_is_rain();
 
+// What the clock face reads to decide whether Potsy stands in its avatar slot
+// (the persona's `mini`, default on). Needs no Potsy headers in ui.cpp.
+bool mini_on_clock();
+
 // Outfit controls for the settings menu and the persona message. Both cycle
 // directions step only through unlocked outfits; select_outfit unlocks the
 // set if the owner picks a locked one. `outfit_label()` names the current one.
 void cycle_outfit(bool forward);
 void select_outfit(uint8_t index);
 const char* outfit_label();
+
+// The character's own behaviour, set from the persona message or the settings
+// menu: the idle-chatter level (0 quiet, 1 normal, 2 talkative), his animation
+// tempo in percent (50..200, applied at once), and whether he also stands on
+// the clock face. Each persists; both labels name the current value.
+void select_banter(uint8_t level);
+void select_tempo(uint8_t pct);
+void select_mini(bool on);
+const char* banter_label();
+const char* mini_label();
+uint8_t tempo_percent();
 
 // The current background's name (the settings row's body): one label per value.
 const char* background_label();

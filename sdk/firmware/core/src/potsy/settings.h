@@ -48,12 +48,68 @@ namespace Settings {
         prefs.putUChar("bg", value);
     }
 
+    // The persona knobs are runtime now (they came from Hermes' persona message
+    // or the settings menu) and persist in Potsy's Preferences namespace next to
+    // the background. They keep a default until something sets one, so a device
+    // that never heard from Hermes behaves exactly as the compile-time build did.
+    // Storage behind Preferences is the port's hg::Storage once
+    // potsy_glue::set_storage() runs; reads before that yield the default.
+    inline uint8_t s_banter = 2;      // 0 quiet, 1 normal, 2 talkative
+    inline uint8_t s_tempoPct = 100;  // his animation speed, percent of the designed one
+    inline bool    s_mini = true;     // whether he also stands on the clock face
+    inline bool    s_knobsLoaded = false;
+
+    inline void loadKnobs() {
+        if (s_knobsLoaded) return;
+        Preferences prefs;
+        prefs.begin("settings", false);
+        s_banter = prefs.getUChar("banter", 2);
+        if (s_banter > 2) s_banter = 2;
+        s_tempoPct = prefs.getUChar("tempo", 100);
+        if (s_tempoPct < 50) s_tempoPct = 50;
+        if (s_tempoPct > 200) s_tempoPct = 200;
+        s_mini = prefs.getBool("mini", true);
+        s_knobsLoaded = true;
+    }
+
     constexpr bool       auraShown()      { return false; }
     // 1 = RU: the RU banks in potsy_ru.inc are what the device speaks. The
     // pools stay in flash either way; this only picks which one is read.
     constexpr uint8_t    lang()           { return 1; }  // 0 EN, 1 RU
-    constexpr uint8_t    banter()         { return 2; }  // nonzero: idle chatter stays on
-    constexpr float      banterScale()    { return 1.0f; }
-    constexpr uint8_t    mascotTempoPct() { return 100; }
+    // Idle chatter and the tempo are read from the runtime knobs above; both
+    // used to be constexpr here, which is why potsy.cpp asks for them per frame.
+    inline uint8_t       banter()         { loadKnobs(); return s_banter; }
+    inline float         banterScale()    { return banter() == 0 ? 2.5f : banter() == 1 ? 1.0f : 0.5f; }
+    inline uint8_t       mascotTempoPct() { loadKnobs(); return s_tempoPct; }
+    // Whether the clock face draws the mini Potsy in its avatar slot.
+    inline bool          miniOnClock()    { loadKnobs(); return s_mini; }
+
+    // Setters: the persona message and the settings menu. Each persists, so the
+    // device keeps the look after a reboot or while it is offline.
+    inline void setBanter(uint8_t value) {
+        if (value > 2) value = 2;
+        s_banter = value;
+        s_knobsLoaded = true;
+        Preferences prefs;
+        prefs.begin("settings", false);
+        prefs.putUChar("banter", value);
+    }
+    inline uint8_t currentTempo() { loadKnobs(); return s_tempoPct; }
+    inline void setTempoPct(uint8_t value) {
+        if (value < 50) value = 50;
+        if (value > 200) value = 200;
+        s_tempoPct = value;
+        s_knobsLoaded = true;
+        Preferences prefs;
+        prefs.begin("settings", false);
+        prefs.putUChar("tempo", value);
+    }
+    inline void setMini(bool value) {
+        s_mini = value;
+        s_knobsLoaded = true;
+        Preferences prefs;
+        prefs.begin("settings", false);
+        prefs.putBool("mini", value);
+    }
 
 }  // namespace Settings

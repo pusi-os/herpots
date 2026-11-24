@@ -161,6 +161,31 @@ void cycle_outfit(bool forward) {
 
 void select_outfit(uint8_t index) { seed_unlock(); Potsy::selectOutfit(index); }
 
+// The character's own behaviour, from the persona message or the settings menu.
+// The tempo is applied to Potsy immediately (he caches his durations at run
+// time), so a change is visible without a reboot.
+void select_banter(uint8_t level) { Settings::setBanter(level); }
+void select_tempo(uint8_t pct) {
+  Settings::setTempoPct(pct);
+  Potsy::setTempo(Settings::currentTempo());
+}
+void select_mini(bool on) { Settings::setMini(on); }
+bool mini_on_clock() { return Settings::miniOnClock(); }
+uint8_t tempo_percent() { return Settings::currentTempo(); }
+const char* banter_label() {
+  const bool ru = Settings::lang() != 0;
+  switch (Settings::banter()) {
+    case 0:  return ru ? "Тихий" : "Quiet";
+    case 2:  return ru ? "Болтливый" : "Talkative";
+    default: return ru ? "Обычный" : "Normal";
+  }
+}
+const char* mini_label() {
+  const bool ru = Settings::lang() != 0;
+  return Settings::miniOnClock() ? (ru ? "На часах" : "On the clock")
+                                 : (ru ? "Скрыт" : "Hidden");
+}
+
 const char* outfit_label() { return Potsy::outfitName(); }
 
 // The background's own name, for the settings row: the fills look alike,

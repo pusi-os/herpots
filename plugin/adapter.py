@@ -1239,8 +1239,8 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
                 sent += 1
         return {"ok": True, "sent": sent}
 
-    async def _send_persona(self, session: DeviceSession, settings: Optional[Dict[str, int]] = None) -> bool:
-        """Send `persona` (the profile's outfit and background) to one device, and False rather than
+    async def _send_persona(self, session: DeviceSession, settings: Optional[Dict[str, Any]] = None) -> bool:
+        """Send `persona` (the profile's look and behaviour) to one device, and False rather than
         raise: a device that predates the message ignores an unknown type anyway, so a failed push
         must not drop the session or hold up the rest of on_ready."""
         try:
@@ -1248,8 +1248,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
                 if self._status_dir is None:
                     return False
                 settings = await asyncio.to_thread(persona_store.settings, self._status_dir, session.profile)
-            await session.send_json(protocol.message(
-                "persona", outfit=settings["outfit"], background=settings["background"]))
+            await session.send_json(protocol.message("persona", **persona_store.wire(settings)))
             return True
         except Exception as exc:
             logger.debug("[%s] persona push to %s failed: %s", self.name, session.device_id, exc)

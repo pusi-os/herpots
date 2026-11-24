@@ -9,9 +9,9 @@ import { CSS } from './styles.js'
 
 const VIRTUAL_NAME = 'Desktop HerPots'
 
-// What a device draws over Hermes (the persona message): the outfit and background a profile's
-// devices show, in the order the firmware numbers them. The look is saved per Hermes profile, not
-// per device; the devices answering a profile get it at their next welcome and on every change.
+// What a device draws and how the character behaves over Hermes (the persona message), in the
+// order the firmware numbers them. The look is saved per Hermes profile, not per device; the
+// devices answering a profile get it at their next welcome and on every change.
 const OUTFITS = [
   'НЕТ', 'ТАНОУКИ', 'ЕДИНОРОГ', 'ФОЛЬГА', 'ТЕНЬ', 'САНТЕХНИК', 'ВЫСОКИЙ БРАТ',
   'СИНИЙ ВИХРЬ', 'КАПИТАН', 'ХРОМОВОЕ КРЫЛО', 'ГЛАЗ ПУСТОТЫ', 'ЗИМНЯЯ ПАРКА', 'TH3 0N3',
@@ -19,6 +19,10 @@ const OUTFITS = [
 const BACKGROUNDS = [
   'ЦИФРОВОЙ ДОЖДЬ', 'ЗВЁЗДНОЕ НЕБО', 'ТОСТЕРЫ', 'СВЕТЛЯЧКИ', 'ЧЁРНЫЙ',
 ]
+const BANTER = ['ТИХИЙ', 'ОБЫЧНЫЙ', 'БОЛТЛИВЫЙ']
+const TEMPOS = [60, 80, 100, 120, 150, 200]
+const MINI = ['СКРЫТ', 'НА ЧАСАХ']
+const DEFAULTS = { outfit: 0, background: 0, banter: 1, tempo: 100, mini: true }
 
 function useNow(ms = 500) {
   const [now, setNow] = useState(() => Date.now())
@@ -408,8 +412,9 @@ function Controls({ d, rest }) {
 }
 
 function Persona({ d, rest }) {
-  // The selected device's look, saved for the Hermes profile answering it (its own for one that
-  // switches, default for the rest). The selects save the whole record, so the two change together.
+  // The selected device's look and behaviour, saved for the Hermes profile answering it (its own
+  // for one that switches, default for the rest). Each select saves the whole record, so changing
+  // one keeps the rest.
   const [persona, setPersona] = useState(null)
   const [error, setError] = useState(null)
   const profile = d.profile || 'default'
@@ -418,17 +423,16 @@ function Persona({ d, rest }) {
       if (r?.ok) setPersona(r.persona ?? {})
     }).catch(() => {})
   }, [rest])
-  const record = persona?.[profile] ?? {}
-  const outfit = Number.isFinite(record.outfit) ? record.outfit : 0
-  const background = Number.isFinite(record.background) ? record.background : 0
-  const save = async (nextOutfit, nextBackground) => {
+  const record = { ...DEFAULTS, ...(persona?.[profile] ?? {}) }
+  const save = async (changes) => {
+    const next = { ...record, ...changes }
     setError(null)
-    setPersona(p => ({ ...(p ?? {}), [profile]: { outfit: nextOutfit, background: nextBackground } }))
+    setPersona(p => ({ ...(p ?? {}), [profile]: next }))
     try {
       const answer = await rest('/persona', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, outfit: nextOutfit, background: nextBackground })
+        body: JSON.stringify({ profile, ...changes })
       })
       if (!answer?.ok) throw new Error(answer?.error ?? 'Failed')
     } catch (e) {
@@ -440,13 +444,33 @@ function Persona({ d, rest }) {
     <div className="hg-field" aria-label="Персонаж">
       <span>Персонаж ({profile})</span>
       <div className="hg-row">
-        <select className="hg-input" value={outfit} aria-label="Костюм" onChange={e => save(Number(e.target.value), background)}>
+        <select className="hg-input" value={record.outfit} aria-label="Костюм"
+                onChange={e => save({ outfit: Number(e.target.value) })}>
           {OUTFITS.map((name, i) => <option key={name} value={i}>{name}</option>)}
         </select>
       </div>
       <div className="hg-row">
-        <select className="hg-input" value={background} aria-label="Фон" onChange={e => save(outfit, Number(e.target.value))}>
+        <select className="hg-input" value={record.background} aria-label="Фон"
+                onChange={e => save({ background: Number(e.target.value) })}>
           {BACKGROUNDS.map((name, i) => <option key={name} value={i}>{name}</option>)}
+        </select>
+      </div>
+      <div className="hg-row">
+        <select className="hg-input" value={record.banter} aria-label="Болтовня"
+                onChange={e => save({ banter: Number(e.target.value) })}>
+          {BANTER.map((name, i) => <option key={name} value={i}>{name}</option>)}
+        </select>
+      </div>
+      <div className="hg-row">
+        <select className="hg-input" value={record.tempo} aria-label="Темп"
+                onChange={e => save({ tempo: Number(e.target.value) })}>
+          {TEMPOS.map(t => <option key={t} value={t}>{t}%</option>)}
+        </select>
+      </div>
+      <div className="hg-row">
+        <select className="hg-input" value={record.mini ? 1 : 0} aria-label="Потсик на часах"
+                onChange={e => save({ mini: Number(e.target.value) === 1 })}>
+          {MINI.map((name, i) => <option key={name} value={i}>{name}</option>)}
         </select>
       </div>
       {error ? <div className="hg-error">{error}</div> : null}

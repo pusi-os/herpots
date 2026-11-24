@@ -863,13 +863,22 @@ void App::h_profile(const json::Value& m) {
 }
 
 // Hermes's look for this device's answering profile (the persona the plugin
-// keeps per bot): Potsy's outfit and the hero backdrop. Numbers clamp; the
-// look persists on the device, so a device taken offline keeps it.
+// keeps per bot): Potsy's outfit, the hero backdrop, and the knobs that used
+// to be compile-time constants — his idle chatter, his animation tempo, and
+// whether he also stands on the clock face. Numbers are clamped by the glue
+// (Settings::* and Potsy::setTempo()); the look persists on the device, so a
+// device taken offline keeps it.
 void App::h_persona(const json::Value& m) {
   const json::Value& background = m["background"];
   const json::Value& outfit = m["outfit"];
+  const json::Value& banter = m["banter"];
+  const json::Value& tempo = m["tempo"];
+  const json::Value& mini = m["mini"];
   if (background.is_number()) potsy_glue::select_background(static_cast<uint8_t>(background.as_int()));
   if (outfit.is_number()) potsy_glue::select_outfit(static_cast<uint8_t>(outfit.as_int()));
+  if (banter.is_number()) potsy_glue::select_banter(static_cast<uint8_t>(banter.as_int()));
+  if (tempo.is_number()) potsy_glue::select_tempo(static_cast<uint8_t>(tempo.as_int()));
+  if (mini.is_bool()) potsy_glue::select_mini(mini.as_bool());
 }
 
 void App::h_face(const json::Value& m) {

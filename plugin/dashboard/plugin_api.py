@@ -118,11 +118,14 @@ def devices() -> dict[str, Any]:
 # -- character appearance -------------------------------------------------------------------------
 
 class PersonaBody(BaseModel):
-    """One profile's look: which outfit and background its devices draw. A None field keeps
-    what the profile had."""
+    """One profile's look: which costume and backdrop its devices draw, and how the character
+    behaves. A None field keeps what the profile had."""
     profile: str
     outfit: int | None = None
     background: int | None = None
+    banter: int | None = None
+    tempo: int | None = None
+    mini: bool | None = None
 
 
 @router.get("/persona")
@@ -136,7 +139,8 @@ def persona_write(body: PersonaBody) -> dict[str, Any]:
     """Save one profile's character appearance and push it to the connected devices answering that
     profile now, through the desk inbox the gateway carries, like a card or an action."""
     try:
-        persona_store.save(_data_dir(), body.profile, body.outfit, body.background)
+        persona_store.save(_data_dir(), body.profile, outfit=body.outfit, background=body.background,
+                           banter=body.banter, tempo=body.tempo, mini=body.mini)
     except ValueError as exc:
         return _error(str(exc))
     desk = Desk(_data_dir())

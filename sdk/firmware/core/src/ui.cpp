@@ -2812,7 +2812,9 @@ void Ui::draw_clock(const UiModel& m) {
     if (face_y >= 0) {
       // The profile's Hermes avatar, or — for Potsy builds — the same Potsy
       // as the hero band, sized to the avatar's slot: same character, smaller.
-      if (m.potsy)
+      // The profile's own choice (persona: mini) says whether he stands here;
+      // hiding him leaves the profile's avatar in the slot instead.
+      if (m.potsy && potsy_glue::mini_on_clock())
         potsy_glue::draw_mini_hero(panel, cx + dx, face_y + dy, face.size, m.now_ms);
       else
         draw_face(panel, cx + dx - face.size / 2, face_y + dy, face, m.face, kText);

@@ -33,6 +33,9 @@ namespace hg::i18n {
   X(BrightnessUnavailable,  "Brightness control is unavailable.") \
   X(OutfitSetting,          "Potsy outfit") \
   X(BackgroundSetting,      "Background") \
+  X(BanterSetting,          "Potsy chatter") \
+  X(TempoSetting,           "Potsy tempo") \
+  X(MiniSetting,            "Potsy on the clock") \
   X(BackgroundDigitalRain,  "Digital rain") \
   X(BackgroundSimple,       "Plain") \
   X(TalkMode,               "Talk mode") \

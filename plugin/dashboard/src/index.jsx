@@ -31,9 +31,9 @@ const REFRESH_MS = 10000;
 // The SDK's fetch has no timeout: a request that never answers would stop the polling for good.
 const REQUEST_TIMEOUT_MS = 15000;
 
-// What a device draws over Hermes (the persona message): the outfit and background a profile's
-// devices show, in the order the firmware numbers them. The look is saved per Hermes profile, not
-// per device; the devices answering a profile get it at their next welcome and on every change.
+// What a device draws and how the character behaves over Hermes (the persona message), in the
+// order the firmware numbers them. The look is saved per Hermes profile, not per device; the
+// devices answering a profile get it at their next welcome and on every change.
 const OUTFITS = [
   "НЕТ", "ТАНОУКИ", "ЕДИНОРОГ", "ФОЛЬГА", "ТЕНЬ", "САНТЕХНИК", "ВЫСОКИЙ БРАТ",
   "СИНИЙ ВИХРЬ", "КАПИТАН", "ХРОМОВОЕ КРЫЛО", "ГЛАЗ ПУСТОТЫ", "ЗИМНЯЯ ПАРКА", "TH3 0N3",
@@ -41,6 +41,9 @@ const OUTFITS = [
 const BACKGROUNDS = [
   "ЦИФРОВОЙ ДОЖДЬ", "ЗВЁЗДНОЕ НЕБО", "ТОСТЕРЫ", "СВЕТЛЯЧКИ", "ЧЁРНЫЙ",
 ];
+const BANTER = ["ТИХИЙ", "ОБЫЧНЫЙ", "БОЛТЛИВЫЙ"];
+const TEMPOS = [60, 80, 100, 120, 150, 200];
+const MINI = ["СКРЫТ", "НА ЧАСАХ"];
 
 function errorText(err) {
   return String((err && err.message) || err).replace(/^Error:\s*/, "");
@@ -121,23 +124,46 @@ function SaveReport({ device }) {
   );
 }
 
-// One device's look: the outfit and background its screen draws, saved for the Hermes profile
-// answering it. The selects show the profile's stored values (0, 0 when it has none yet) and save
-// the whole record, so the two selects always change it together.
+// One profile's look and behaviour, saved for the Hermes profile answering a device: the costume
+// and backdrop its screen draws, how much he chatters, how fast he animates, and whether he also
+// stands on the clock face. The controls show the profile's stored values and save the whole
+// record, so changing one keeps the rest.
 function Persona({ device, persona, onSave }) {
   const record = persona[device.profile] || {};
   const outfit = typeof record.outfit === "number" ? record.outfit : 0;
   const background = typeof record.background === "number" ? record.background : 0;
+  const banter = typeof record.banter === "number" ? record.banter : 1;
+  const tempo = typeof record.tempo === "number" ? record.tempo : 100;
+  const mini = typeof record.mini === "boolean" ? record.mini : true;
   const select = "w-full px-1 py-0.5 text-xs rounded border border-input bg-background";
+  const save = (changes) => onSave(device.profile, { outfit, background, banter, tempo, mini, ...changes });
+  const label = "text-[10px] uppercase text-muted-foreground";
   return (
     <div className="flex flex-col gap-1" aria-label={`Персонаж (${device.profile})`}>
+      <div className={label}>Костюм</div>
       <select className={select} value={outfit} aria-label="Костюм"
-              onChange={(e) => onSave(device.profile, Number(e.target.value), background)}>
+              onChange={(e) => save({ outfit: Number(e.target.value) })}>
         {OUTFITS.map((name, i) => <option key={name} value={i}>{name}</option>)}
       </select>
+      <div className={label}>Фон</div>
       <select className={select} value={background} aria-label="Фон"
-              onChange={(e) => onSave(device.profile, outfit, Number(e.target.value))}>
+              onChange={(e) => save({ background: Number(e.target.value) })}>
         {BACKGROUNDS.map((name, i) => <option key={name} value={i}>{name}</option>)}
+      </select>
+      <div className={label}>Болтовня</div>
+      <select className={select} value={banter} aria-label="Болтовня"
+              onChange={(e) => save({ banter: Number(e.target.value) })}>
+        {BANTER.map((name, i) => <option key={name} value={i}>{name}</option>)}
+      </select>
+      <div className={label}>Темп</div>
+      <select className={select} value={tempo} aria-label="Темп"
+              onChange={(e) => save({ tempo: Number(e.target.value) })}>
+        {TEMPOS.map((t) => <option key={t} value={t}>{t}%</option>)}
+      </select>
+      <div className={label}>На часах</div>
+      <select className={select} value={mini ? 1 : 0} aria-label="Потсик на часах"
+              onChange={(e) => save({ mini: Number(e.target.value) === 1 })}>
+        {MINI.map((name, i) => <option key={name} value={i}>{name}</option>)}
       </select>
     </div>
   );
@@ -221,15 +247,15 @@ function HerPotsPage() {
     loadPersona();
   }, [loadPersona]);
 
-  const savePersona = useCallback((profile, outfit, background) => {
+  const savePersona = useCallback((profile, changes) => {
     // Shown at once; a push the gateway didn't take is reverted from the store and reported.
     const before = persona;
-    setPersona((p) => ({ ...p, [profile]: { outfit, background } }));
+    setPersona((p) => ({ ...p, [profile]: { ...(p[profile] || {}), ...changes } }));
     setPersonaError("");
     SDK.fetchJSON(apiUrl("/persona"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile, outfit, background }),
+      body: JSON.stringify({ profile, ...changes }),
     })
       .then((r) => {
         if (!r || !r.ok) throw new Error((r && r.error) || "The look was not saved");
