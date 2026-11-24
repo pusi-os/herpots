@@ -1294,7 +1294,13 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
                 if self._status_dir is None:
                     return False
                 settings = await asyncio.to_thread(persona_store.settings, self._status_dir, session.profile)
-            await session.send_json(protocol.message("persona", **persona_store.wire(settings)))
+            # The costume is the DEVICE's own wardrobe choice and must survive profile switches:
+            # every push used to re-apply the bot's stored outfit, clobbering what the user wears
+            # (the unicorn kept coming back on every switch). The dashboard still stores outfit
+            # per bot, but the push no longer carries it — the device keeps what was picked there.
+            payload = persona_store.wire(settings)
+            payload.pop("outfit", None)
+            await session.send_json(protocol.message("persona", **payload))
             return True
         except Exception as exc:
             logger.debug("[%s] persona push to %s failed: %s", self.name, session.device_id, exc)
