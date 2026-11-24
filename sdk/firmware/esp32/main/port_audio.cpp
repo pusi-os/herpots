@@ -25,6 +25,11 @@ constexpr uint32_t kPrimeMs = 180;    // hold playback until the queue holds thi
 constexpr uint32_t kDrainSettleMs = 100;  // the DMA still plays what write() queued when the
                                       // queue ran dry; give it time to finish before the
                                       // channel (and the amp clock) goes away
+// A click is a step in the signal, and enabling or disabling the I2S channel steps it hard:
+// the DAC jumps from 0 to whatever the first sample is and back. Ramp the first and last few
+// milliseconds so the waveform starts and ends at silence (what xiaozhi-esp32's codecs do with
+// their own fade and PA sequencing).
+constexpr uint32_t kFadeMs = 5;
 
 i2s_std_config_t std_config(uint32_t rate, i2s_data_bit_width_t bits, int bclk, int ws, int dout, int din) {
   i2s_std_config_t cfg = {};
@@ -198,6 +203,7 @@ void I2sSpeaker::task(void* arg) {
   bool enabled = false;
   bool primed = false;  // the prime gate applies to the first enable of a playback sequence only;
                         // a mid-stream underrun must not hold small chunks back
+  bool fading_in_done_ = false;  // the ramp ran on this sequence's first written samples
   uint32_t applied_rate = self->rate_.load();
   hg::SpeakerUnderruns gaps;
   for (;;) {
@@ -209,6 +215,7 @@ void I2sSpeaker::task(void* arg) {
         enabled = false;
       }
       primed = false;
+      fading_in_done_ = false;  // the next sequence ramps in from silence again
       self->flush_ = false;  // only after the reset: a write() waiting for it is not wiped
     }
     // The prime gate runs BEFORE the receive: a chunk pulled out of the queue cannot be
@@ -227,9 +234,23 @@ void I2sSpeaker::task(void* arg) {
           log_underruns(TAG, gaps.finish());
           vTaskDelay(pdMS_TO_TICKS(kDrainSettleMs));  // the DMA is still playing what write()
                                                       // queued; a cut here is an end-of-reply click
+          // Fill the DMA ring with silence before disabling the channel: disabling mid-waveform
+          // is the same step the start click is, heard at the end of every reply.
+          const uint32_t tail_rate = self->rate_.load();
+          size_t tail = std::max<size_t>(kSpeakerChunk, tail_rate / 1000u * 2u * 40u);  // ~40 ms
+          memset(chunk, 0, sizeof(chunk));
+          size_t left = tail;
+          while (left > 0) {
+            size_t part = std::min(left, sizeof(chunk));
+            size_t done = 0;
+            if (i2s_channel_write(self->tx_, chunk, part, &done, pdMS_TO_TICKS(100)) != ESP_OK) break;
+            if (done == 0) break;
+            left -= done;
+          }
           i2s_channel_disable(self->tx_);
           enabled = false;
           primed = false;  // the next sequence primes from silence again
+          fading_in_done_ = false;
         }
       }
       continue;
@@ -248,6 +269,23 @@ void I2sSpeaker::task(void* arg) {
     size_t n = got / sizeof(int16_t);
     int vol = self->volume_.load();
     for (size_t i = 0; i < n; ++i) chunk[i] = static_cast<int16_t>(chunk[i] * vol / 100);
+    // Ramp a stream's first and last samples into and out of silence: switching the I2S channel
+    // on at a non-zero sample (and off at one) is the click heard at every reply's start and end.
+    const uint32_t rate = self->rate_.load();
+    const size_t fade = std::max<size_t>(1, static_cast<size_t>(rate) * kFadeMs / 1000);
+    if (!fading_in_done_) {
+      for (size_t i = 0; i < n && i < fade; ++i)
+        chunk[i] = static_cast<int16_t>(static_cast<int32_t>(chunk[i]) * static_cast<int32_t>(i) /
+                                        static_cast<int32_t>(fade));
+      fading_in_done_ = true;
+    }
+    if (!self->open_ && self->draining_) {  // the last queued chunk: fade its tail away
+      for (size_t i = 0; i < n && i < fade; ++i) {
+        const size_t at = n - 1 - i;
+        chunk[at] = static_cast<int16_t>(static_cast<int32_t>(chunk[at]) * static_cast<int32_t>(i) /
+                                         static_cast<int32_t>(fade));
+      }
+    }
     size_t written = 0;
     i2s_channel_write(self->tx_, chunk, n * sizeof(int16_t), &written, pdMS_TO_TICKS(200));
   }

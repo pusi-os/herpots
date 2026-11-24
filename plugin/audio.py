@@ -90,10 +90,23 @@ class Resampler:
         out = array("h")
         pos, step = self._pos, self._step
         last = n - 1
+        # When the rate goes DOWN, plain linear interpolation folds everything above half the
+        # destination rate back into the audible band: on speech that is the crackle and hiss
+        # heard over "s" and "sh". Averaging the samples the step covers is a cheap box filter
+        # at exactly the decimation factor, which removes most of it.
+        decim = step > 1.0001
+        reach = max(1, int(step))
         while pos < last:
             i = int(pos)
-            a = buf[i]
-            out.append(int(a + (buf[i + 1] - a) * (pos - i)))
+            if decim:
+                j = min(i + reach, last)
+                a = sum(buf[i : j + 1]) / (j - i + 1)
+                nxt = min(j + 1, last)
+                b = buf[nxt]
+            else:
+                a = buf[i]
+                b = buf[i + 1]
+            out.append(int(a + (b - a) * (pos - i)))
             pos += step
         # The next chunk is prefixed with this chunk's last sample (index 0).
         self._pos = pos - last
@@ -121,7 +134,10 @@ def decode_file(path: str, rate: int) -> bytes:
         with wave.open(path, "rb") as w:
             if w.getsampwidth() == 2 and w.getcomptype() == "NONE":
                 raw = w.readframes(w.getnframes())
-                return resample(raw, w.getframerate(), rate, w.getnchannels())
+                if w.getframerate() == rate:
+                    return _to_bytes(downmix(_samples(raw), w.getnchannels()))
+                # A rate change goes through ffmpeg too: its resampler filters before decimating,
+                # and the hand-rolled one cannot do that without the whole signal in hand.
     except (wave.Error, EOFError):
         pass  # not a plain PCM WAV; fall through to ffmpeg
     ffmpeg = shutil.which("ffmpeg")
