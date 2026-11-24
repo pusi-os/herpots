@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 
 #include "hg/crypto.hpp"
@@ -3646,6 +3647,43 @@ std::string App::console(std::string_view raw) {
            "forget <ssid>] | phone [pair [close] | forget] | perf [on | off | reset | budget <us> | bench [scroll | mascot | redraw | all]] | face [<expression> [seconds]] | yes | no | choose <n> | choose cancel | reconnect | forget-key | factory-reset   keys:" + keys;
   }
   if (cmd == "status") return "@status " + status_json();
+  if (cmd == "tone") {
+    // Self-test that never touches the host: generate a sine straight into the speaker. If this
+    // crackles, the fault is in the I2S path on this board and has nothing to do with TTS, Opus
+    // or the plugin's resampler. `tone [hz] [ms] [percent]`.
+    double hz = 440.0, ms = 3000.0, level = 70.0;
+    {
+      char buf[128];
+      std::snprintf(buf, sizeof(buf), "%s", rest.c_str());
+      double a = 0, b = 0, c = 0;
+      const int got = std::sscanf(buf, "%lf %lf %lf", &a, &b, &c);
+      if (got >= 1 && a > 0) hz = a;
+      if (got >= 2 && b > 0) ms = b;
+      if (got >= 3 && c > 0) level = c;
+    }
+    if (!hal_.speaker) return "@error no speaker";
+    const uint32_t rate = profile_.speaker_rate ? profile_.speaker_rate : 16000;
+    const size_t total = static_cast<size_t>(rate * ms / 1000.0);
+    std::vector<int16_t> block(256);
+    // Halve the level so a squared volume curve at 100% still has headroom.
+    const double amp = 32767.0 * (level / 100.0) * 0.5;
+    hal_.speaker->begin(rate);
+    for (size_t done = 0; done < total;) {
+      const size_t n = std::min(block.size(), total - done);
+      for (size_t i = 0; i < n; ++i, ++done) {
+        // A short fade at both ends keeps the test itself from adding a click.
+        const size_t ramp = std::min<size_t>({done, total - done, static_cast<size_t>(rate / 200)});
+        const double gain = ramp == 0 ? 0.0 : static_cast<double>(ramp) / (rate / 200.0);
+        constexpr double kPi = 3.14159265358979323846;
+        block[i] = static_cast<int16_t>(amp * gain * ::sin(2.0 * kPi * hz * static_cast<double>(done) / rate));
+      }
+      hal_.speaker->write(block.data(), n);
+    }
+    hal_.speaker->end();
+    char out[96];
+    std::snprintf(out, sizeof(out), "@ok tone %.0f Hz for %.0f ms at %.0f%%", hz, ms, level);
+    return out;
+  }
   if (cmd == "phone") {
     if (!on_phone_pair) return "@error Bluetooth is not enabled on this board";
     if (rest.empty()) return "@phone " + phone_value().dump();

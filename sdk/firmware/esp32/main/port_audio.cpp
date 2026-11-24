@@ -144,8 +144,18 @@ void I2sMic::task(void* arg) {
 bool I2sSpeaker::begin(const I2sSpeakerConfig& cfg) {
   i2s_chan_config_t chan = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
   chan.auto_clear = true;  // silence on underrun instead of repeating the last buffer
+  // Explicit DMA like xiaozhi-esp32's raw-I2S codec: the default ring is short enough that a
+  // scheduler hiccup leaves the amp reading a half-filled buffer, and that is audible as crackle.
+  chan.dma_desc_num = 6;
+  chan.dma_frame_num = 240;
   if (i2s_new_channel(&chan, &tx_, nullptr) != ESP_OK) return false;
-  i2s_std_config_t std_cfg = std_config(rate_, I2S_DATA_BIT_WIDTH_16BIT, cfg.bclk, cfg.ws, cfg.dout, -1);
+  // 32-bit slots, not 16: the amp clocks whole 32-bit frames, and handing it 16-bit slots makes
+  // it sample the shift register on the wrong edge — broadband noise under speech, the crackle.
+  // The samples stay 16-bit in the queue and are widened on the way out (see task()).
+  i2s_std_config_t std_cfg = std_config(rate_, I2S_DATA_BIT_WIDTH_32BIT,
+                                        cfg.bclk, cfg.ws, cfg.dout, -1);
+  std_cfg.slot_cfg.slot_bit_width = I2S_SLOT_BIT_WIDTH_AUTO;
+  std_cfg.slot_cfg.ws_width = I2S_DATA_BIT_WIDTH_32BIT;
   if (i2s_channel_init_std_mode(tx_, &std_cfg) != ESP_OK) return false;
   uint8_t* storage = static_cast<uint8_t*>(heap_caps_malloc(kSpeakerBuffer + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
   static StaticStreamBuffer_t control;
@@ -200,6 +210,8 @@ void I2sSpeaker::task(void* arg) {
   // Owns every channel state change (enable, disable, clock) so the app task never races it.
   auto* self = static_cast<I2sSpeaker*>(arg);
   int16_t chunk[kSpeakerChunk];
+  // The channel runs 32-bit slots, so every write goes out widened (see the widening below).
+  static int32_t wide[kSpeakerChunk];
   bool enabled = false;
   bool primed = false;  // the prime gate applies to the first enable of a playback sequence only;
                         // a mid-stream underrun must not hold small chunks back
@@ -237,13 +249,14 @@ void I2sSpeaker::task(void* arg) {
           // Fill the DMA ring with silence before disabling the channel: disabling mid-waveform
           // is the same step the start click is, heard at the end of every reply.
           const uint32_t tail_rate = self->rate_.load();
-          size_t tail = std::max<size_t>(kSpeakerChunk, tail_rate / 1000u * 2u * 40u);  // ~40 ms
-          memset(chunk, 0, sizeof(chunk));
+          // In 32-bit words: ~40 ms of samples is tail_rate/1000*40 words, 4 bytes each.
+          size_t tail = std::max<size_t>(sizeof(wide), static_cast<size_t>(tail_rate) / 1000u * 4u * 40u);
+          memset(wide, 0, sizeof(wide));
           size_t left = tail;
           while (left > 0) {
-            size_t part = std::min(left, sizeof(chunk));
+            size_t part = std::min(left, sizeof(wide));
             size_t done = 0;
-            if (i2s_channel_write(self->tx_, chunk, part, &done, pdMS_TO_TICKS(100)) != ESP_OK) break;
+            if (i2s_channel_write(self->tx_, wide, part, &done, pdMS_TO_TICKS(100)) != ESP_OK) break;
             if (done == 0) break;
             left -= done;
           }
@@ -267,8 +280,12 @@ void I2sSpeaker::task(void* arg) {
       primed = true;
     }
     size_t n = got / sizeof(int16_t);
-    int vol = self->volume_.load();
-    for (size_t i = 0; i < n; ++i) chunk[i] = static_cast<int16_t>(chunk[i] * vol / 100);
+    // Volume the way xiaozhi-esp32's raw-I2S codec applies it: a squared, 16.16 fixed-point
+    // factor multiplied in 64 bits. `sample * vol / 100` steps the signal into quantisation
+    // staircases at anything below 100%, which is audible as grit under speech.
+    const int vol = self->volume_.load();
+    const int32_t factor = static_cast<int32_t>(
+        static_cast<double>(vol) / 100.0 * (static_cast<double>(vol) / 100.0) * 65536.0);
     // Ramp a stream's first and last samples into and out of silence: switching the I2S channel
     // on at a non-zero sample (and off at one) is the click heard at every reply's start and end.
     const uint32_t rate = self->rate_.load();
@@ -286,8 +303,18 @@ void I2sSpeaker::task(void* arg) {
                                          static_cast<int32_t>(fade));
       }
     }
+    // Widen and scale in one step, the way xiaozhi-esp32 does: a 16-bit sample times a 16.16
+    // factor lands directly on the 32-bit slot's full scale, so no separate shift is needed.
+    // Clamped in 64 bits so a loud passage cannot wrap around into a burst of noise.
+    for (size_t i = 0; i < n; ++i) {
+      const int64_t scaled = static_cast<int64_t>(chunk[i]) * factor;
+      wide[i] = scaled > INT32_MAX ? INT32_MAX : (scaled < INT32_MIN ? INT32_MIN : static_cast<int32_t>(scaled));
+    }
     size_t written = 0;
-    i2s_channel_write(self->tx_, chunk, n * sizeof(int16_t), &written, pdMS_TO_TICKS(200));
+    // Blocking write, exactly as xiaozhi-esp32's raw-I2S codec does it (portMAX_DELAY): a
+    // timeout here returns a short count and the rest of the chunk is silently dropped, which
+    // is itself a gap in the waveform. This task has nothing else to do with its time.
+    i2s_channel_write(self->tx_, wide, n * sizeof(int32_t), &written, portMAX_DELAY);
   }
 }
 
