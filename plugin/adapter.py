@@ -530,19 +530,22 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
     def _owner_trusts(self, device_id: str) -> bool:
         """The default profile's verdict on this device; only a literal True counts. Other profiles'
         approvals are their own. The listener's sender check is the default profile's answer only while
-        no ``gateway.profile_routes`` entry matches the device: a route makes Hermes read the routed
-        profile instead, and Hermes has no public per-profile check yet
+        no OPERATOR ``gateway.profile_routes`` entry matches the device: such a route makes Hermes read
+        the routed profile instead, and Hermes has no public per-profile check yet
         (NousResearch/hermes-agent#143892). A device that switched before can be
         routed later, so a routed device fails closed here rather than let another profile's approval
-        stand in for the default one."""
+        stand in for the default one. The routes THIS plugin manages are the device's own switching,
+        not a pin: an operator's route is what refuses."""
         try:
-            routed = self.build_source(chat_id=device_id, chat_type="dm", user_id=device_id)
-            if routed.profile is not None or routed.profile_route_rejected is True:
+            runner = getattr(self, "gateway_runner", None)
+            routes = getattr(getattr(runner, "config", None), "profile_routes", None)
+            if profile_routes_mod.operator_routed(routes, PLATFORM_NAME, device_id):
                 if device_id not in self._routed_refused:
                     self._routed_refused.add(device_id)
-                    logger.warning("[%s] %s answers to the default profile, but gateway.profile_routes sends "
-                                   "it elsewhere: refusing it. Remove the route and let it switch profiles "
-                                   "instead.", self.name, device_id)
+                    logger.warning("[%s] %s answers to the default profile, but an operator's "
+                                   "gateway.profile_routes entry sends it elsewhere: refusing it. "
+                                   "Remove the route and let it switch profiles instead.",
+                                   self.name, device_id)
                 return False
             check = self._owner_check or self._is_sender_authorized
             return check(device_id, "dm", device_id) is True
@@ -2060,6 +2063,8 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
     async def on_prompt_reply(self, session: DeviceSession, prompt_id: str, yes: bool) -> None:
         # Unpaired since the question was shown, or no longer trusted by the default profile: it answers nothing.
         if not session.paired or (self._owner_bound(session) and not self._still_trusted(session)):
+            logger.warning("[%s] dropped %s's %s answer to question %s: not trusted (paired=%s)",
+                           self.name, session.device_id, "yes" if yes else "no", prompt_id, session.paired)
             return
         if session.device_id in self._interpreting:
             return  # no answer to Hermes is taken from a gadget in interpreter mode
